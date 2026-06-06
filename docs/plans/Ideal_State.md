@@ -2,9 +2,13 @@
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
+**Domain language:** [Veriqik Domain Language](../domain/Domain_Language.md)
+
 ## 1. Product Vision
 
 Veriqik is a domain-specific authorization database for Fine-Grained Authorization (FGA) and Relationship-Based Access Control (ReBAC).
+
+It is TigerBeetle-inspired in its database posture: a narrow command surface, deterministic state-machine execution, durable log as source of truth, derived indexes, explicit batching, bounded work, and rigorous recovery semantics.
 
 It combines:
 
@@ -38,6 +42,8 @@ This enables permission-level:
 - Benchmarking
 
 Permissions do not create extra graph hops by default. They compile into execution programs.
+
+The schema language is Veriqik-native from day one. Zanzibar informs the ReBAC model, but Veriqik does not aim to clone Zanzibar/OpenFGA syntax or collapse permissions into relations.
 
 ---
 
@@ -91,18 +97,20 @@ flowchart TD
 
 ---
 
-# Phase 0 – MVP 1
+## Phase 0 – MVP 1
 
-## Goal
+### Goal
 
 Build a correct, durable, single-node authorization database.
 
-## Features
+### Features
 
 - Single-node state machine
 - WAL
 - Checkpoints
 - Relationship tuples
+- Stable dictionaries
+- Idempotent write retries
 - Native schema DSL
 - Explicit `relation`
 - Explicit `permission`
@@ -114,7 +122,7 @@ Build a correct, durable, single-node authorization database.
 - Revision consistency
 - Basic stats
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart LR
@@ -125,19 +133,21 @@ flowchart LR
     Engine --> Check[Check Engine]
 ```
 
-## Outcome
+### Outcome
 
 A usable embedded or standalone authorization database.
 
+The first MVP transport can be embedded tests and CLI. A network API is required before comparative load/stress testing against other authorization systems.
+
 ---
 
-# Phase 1 – Core Authorization Semantics
+## Phase 1 – Core Authorization Semantics
 
-## Goal
+### Goal
 
 Support the semantic features needed for meaningful comparison against OpenFGA, SpiceDB/Authzed, and Zanzibar-style systems.
 
-## Features
+### Features
 
 - Union
 - Intersection
@@ -150,7 +160,7 @@ Support the semantic features needed for meaningful comparison against OpenFGA, 
 - Denial explanation summary
 - Multi-branch permission evaluation
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -168,19 +178,19 @@ flowchart TD
     Compiler --> Program[Executable Permission Program]
 ```
 
-## Outcome
+### Outcome
 
 The engine can run realistic FGA benchmarks.
 
 ---
 
-# Phase 2 – Operational Readiness
+## Phase 2 – Operational Readiness
 
-## Goal
+### Goal
 
 Make the engine safe to run.
 
-## Features
+### Features
 
 - Structured logs
 - Metrics
@@ -192,7 +202,7 @@ Make the engine safe to run.
 - Storage scrubber
 - Admin CLI
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -205,19 +215,19 @@ flowchart TD
     Storage[Storage Files] --> Scrubber[Background Scrubber]
 ```
 
-## Outcome
+### Outcome
 
 The engine can be operated and debugged.
 
 ---
 
-# Phase 3 – Domain-Specific QL
+## Phase 3 – Domain-Specific QL
 
-## Goal
+### Goal
 
 Add a human-friendly command language while keeping the engine operation surface narrow.
 
-## Example
+### Example
 
 ```text
 WRITE RELATIONSHIP group:eng#member@user:kien;
@@ -225,7 +235,7 @@ CHECK user:kien CAN view document:doc1;
 EXPLAIN user:kien CAN view document:doc1;
 ```
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -237,23 +247,23 @@ flowchart TD
     CommandIR --> Engine[State Machine]
 ```
 
-## Rule
+### Rule
 
 QL compiles to fixed commands. It is not an arbitrary graph query language.
 
-## Outcome
+### Outcome
 
 Strong developer experience.
 
 ---
 
-# Phase 4 – Performance Analysis and Benchmarking
+## Phase 4 – Performance Analysis and Benchmarking
 
-## Goal
+### Goal
 
 Measure the engine against realistic workloads and existing systems.
 
-## Features
+### Features
 
 - Per-check stats
 - Branch-level traces
@@ -264,7 +274,7 @@ Measure the engine against realistic workloads and existing systems.
 - Comparison workloads
 - Explain cost measurement
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -280,7 +290,7 @@ flowchart TD
     BaselineMetrics --> Report
 ```
 
-## Benchmark Categories
+### Benchmark Categories
 
 - Direct checks
 - Group checks
@@ -294,19 +304,19 @@ flowchart TD
 - Explain-one
 - High-fanout relations
 
-## Outcome
+### Outcome
 
 Evidence-based optimization roadmap.
 
 ---
 
-# Phase 5 – Performance Optimization
+## Phase 5 – Performance Optimization
 
-## Goal
+### Goal
 
 Optimize based on measured bottlenecks.
 
-## Features
+### Features
 
 - Permission plan ordering
 - Fanout statistics
@@ -317,7 +327,7 @@ Optimize based on measured bottlenecks.
 - Optimized `lookupObjects`
 - Optimized `lookupSubjects`
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -335,19 +345,19 @@ flowchart TD
     StoreCache --> Result
 ```
 
-## Outcome
+### Outcome
 
 Lower latency for hot workloads.
 
 ---
 
-# Phase 6 – Replication and Consensus
+## Phase 6 – Replication and Consensus
 
-## Goal
+### Goal
 
 Make Veriqik fault-tolerant.
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -365,7 +375,7 @@ flowchart TD
     LogC --> ApplyC[Apply Indexes]
 ```
 
-## Write Flow
+### Write Flow
 
 ```mermaid
 sequenceDiagram
@@ -383,19 +393,19 @@ sequenceDiagram
     F2-->>L: Ack later
 ```
 
-## Outcome
+### Outcome
 
 Durable replicated authorization history.
 
 ---
 
-# Phase 7 – Distributed Revisions
+## Phase 7 – Distributed Revisions
 
-## Goal
+### Goal
 
 Support read-after-write and read-after-revoke in replicated systems.
 
-## Concepts
+### Concepts
 
 - committed revision
 - applied revision
@@ -403,7 +413,7 @@ Support read-after-write and read-after-revoke in replicated systems.
 - revision tokens
 - follower reads
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -418,19 +428,19 @@ flowchart TD
     R3 --> OK2[Can Answer]
 ```
 
-## Outcome
+### Outcome
 
 Clients can enforce freshness requirements.
 
 ---
 
-# Phase 8 – Sharding and Multi-Tenant Scale
+## Phase 8 – Sharding and Multi-Tenant Scale
 
-## Goal
+### Goal
 
 Scale beyond one write stream.
 
-## Initial Strategy
+### Initial Strategy
 
 Shard by tenant.
 
@@ -447,7 +457,7 @@ flowchart TD
     S3 --> L3[Leader 3]
 ```
 
-## Later Strategy
+### Later Strategy
 
 For very large tenants, shard by:
 
@@ -456,19 +466,19 @@ For very large tenants, shard by:
 - Object namespace
 - Object ID hash
 
-## Outcome
+### Outcome
 
 More write and storage scale.
 
 ---
 
-# Phase 9 – Extended Authorization Semantics
+## Phase 9 – Extended Authorization Semantics
 
-## Goal
+### Goal
 
 Add specialized semantics after baseline performance is understood.
 
-## Features
+### Features
 
 - Wildcards
 - Caveats
@@ -477,7 +487,7 @@ Add specialized semantics after baseline performance is understood.
 - Attribute checks
 - Schema migration validation
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -491,19 +501,19 @@ flowchart TD
     Evaluator --> Decision[Decision]
 ```
 
-## Outcome
+### Outcome
 
 Richer enterprise authorization models.
 
 ---
 
-# Phase 10 – Materialized Authorization
+## Phase 10 – Materialized Authorization
 
-## Goal
+### Goal
 
 Make selected hot permissions extremely fast.
 
-## Features
+### Features
 
 - Effective permission indexes
 - Incremental recomputation
@@ -511,7 +521,7 @@ Make selected hot permissions extremely fast.
 - Revocation-safe invalidation
 - Witness metadata for explain
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -526,7 +536,7 @@ flowchart TD
     EffectiveIndex --> Witness[Proof Witness]
 ```
 
-## Warning
+### Warning
 
 Naive materialization can explode:
 
@@ -534,19 +544,19 @@ Naive materialization can explode:
 users × objects × permissions
 ```
 
-## Outcome
+### Outcome
 
 Sub-millisecond checks for selected hot paths.
 
 ---
 
-# Phase 11 – Global Distribution
+## Phase 11 – Global Distribution
 
-## Goal
+### Goal
 
 Support multi-region operation.
 
-## Features
+### Features
 
 - Regional replicas
 - Geo-aware routing
@@ -556,7 +566,7 @@ Support multi-region operation.
 - Bounded-staleness modes
 - Strong-region mode for sensitive checks
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -568,19 +578,19 @@ flowchart TD
     ClientC[Client in Region C] --> RegionC
 ```
 
-## Outcome
+### Outcome
 
 Enterprise-grade availability and disaster recovery.
 
 ---
 
-# Phase 12 – Authorization Platform
+## Phase 12 – Authorization Platform
 
-## Goal
+### Goal
 
 Turn Veriqik into a complete authorization platform.
 
-## Features
+### Features
 
 - Visual graph explorer
 - Explain UI
@@ -593,7 +603,7 @@ Turn Veriqik into a complete authorization platform.
 - IDE support
 - SDKs
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -610,44 +620,35 @@ flowchart TD
     UI --> Migration[Migration Assistant]
 ```
 
-## Outcome
+### Outcome
 
 A complete authorization platform.
 
 ---
 
-# Revised Build Order
+## Revised Build Order
+
+This sequence is intentionally undated. Dates belong in release planning, not in the long-lived ideal-state document.
 
 ```mermaid
-gantt
-    title Veriqik Revised Roadmap
-    dateFormat  YYYY-MM-DD
-
-    section Foundation
-    MVP 1 Single Node                 :a1, 2026-01-01, 90d
-    Core Authorization Semantics      :a2, after a1, 60d
-    Operational Readiness             :a3, after a2, 45d
-    QL + CLI                          :a4, after a3, 45d
-
-    section Measurement
-    Performance Analysis + Benchmarks :b1, after a4, 60d
-    Optimization Layer                :b2, after b1, 75d
-
-    section Distributed
-    Replication + Consensus           :c1, after b2, 120d
-    Distributed Revisions             :c2, after c1, 60d
-    Sharding                          :c3, after c2, 90d
-
-    section Advanced
-    Extended Authorization Semantics  :d1, after c3, 90d
-    Materialized Authorization        :d2, after d1, 90d
-    Global Distribution               :d3, after d2, 120d
-    Platform Features                 :d4, after d3, 120d
+flowchart TD
+    A[MVP 1 Single Node] --> B[Core Authorization Semantics]
+    B --> C[Operational Readiness]
+    C --> D[QL + CLI]
+    D --> E[Performance Analysis + Benchmarks]
+    E --> F[Optimization Layer]
+    F --> G[Replication + Consensus]
+    G --> H[Distributed Revisions]
+    H --> I[Sharding]
+    I --> J[Extended Authorization Semantics]
+    J --> K[Materialized Authorization]
+    K --> L[Global Distribution]
+    L --> M[Platform Features]
 ```
 
 ---
 
-# Design Principles
+## Design Principles
 
 1. Correctness before speed
 2. WAL/consensus log is the source of truth
@@ -656,8 +657,9 @@ gantt
 5. Checks target permissions
 6. Writes target relations
 7. Revisions are part of the API
-8. Fail closed when authorization state is uncertain
+8. Fail closed when authorization state is uncertain, and report that separately from denial
 9. Batch first
 10. Explainability is a product feature
 11. Keep the operation surface small
 12. Implement comparison-critical semantics before serious benchmarking
+13. Schema and dictionary evolution are durable state-machine changes

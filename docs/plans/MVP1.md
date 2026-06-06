@@ -2,6 +2,8 @@
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
+**Domain language:** [Veriqik Domain Language](../domain/Domain_Language.md)
+
 ## 1. MVP 1 Goal
 
 Build a **single-node, durable, domain-specific FGA/ReBAC database**.
@@ -11,6 +13,8 @@ MVP 1 proves the core Veriqik idea:
 > Authorization logic, relationship storage, indexing, consistency, and explainability belong in one purpose-built database.
 
 Veriqik is not just a policy engine, tuple service, or library. It is a storage-backed authorization database.
+
+The MVP can start as an embedded engine with a CLI/test harness, as long as every command path is testable. A network API becomes required before load/stress testing against OpenFGA, SpiceDB/Authzed, or other external systems.
 
 ---
 
@@ -24,6 +28,8 @@ permission = compiled authorization program
 ```
 
 This is intentionally different from models that treat computed access as just another rewritten relation.
+
+The DSL is Veriqik-native from day one. It is Zanzibar-inspired at the ReBAC model level, but it does not aim for Zanzibar/OpenFGA schema compatibility.
 
 Example:
 
@@ -69,6 +75,11 @@ In MVP 1:
 - Request/batch memoization
 - Basic performance stats
 - Tenant-scoped data model
+- Deterministic replay with stable dictionaries
+- Idempotent write retries via request IDs
+- Canonical command encoding
+- Single-writer/many-reader snapshot consistency
+- Explicit health states
 
 ### Excluded
 
@@ -85,6 +96,7 @@ In MVP 1:
 - Optimized `lookupObjects`
 - Optimized `lookupSubjects`
 - Full graph query language
+- Production-grade network API
 
 ---
 
@@ -101,12 +113,16 @@ flowchart TD
     Engine --> Exists[Exists Index]
     Engine --> Forward[Forward Index]
     Engine --> Reverse[Reverse Index]
+    Engine --> Dictionary[Stable Dictionaries]
+    Engine --> Dedupe[Request Dedupe]
 
     WAL --> Recovery[Recovery]
     Recovery --> Exists
     Recovery --> Forward
     Recovery --> Reverse
     Recovery --> Schema
+    Recovery --> Dictionary
+    Recovery --> Dedupe
 
     Schema --> Check[Check Engine]
     Exists --> Check
@@ -135,6 +151,8 @@ flowchart TD
 ### Deliverable
 
 An in-memory tuple store with basic index maintenance.
+
+The in-memory engine must already apply commands through a deterministic state-machine boundary so WAL replay later uses the same mutation path.
 
 ---
 
@@ -205,7 +223,7 @@ Indexes stay consistent after tuple writes/deletes.
 ### Build
 
 - Permission program evaluation
-- Direct relation checks
+- Internal relation evaluation
 - Userset subject expansion
 - Parent/resource traversal
 - Nested group traversal
@@ -254,7 +272,11 @@ One human-readable proof path for successful checks.
 
 - Append-only WAL
 - Checksummed records
-- One revision per write batch
+- One revision per command batch
+- Canonical command payloads
+- Logged dictionary allocations
+- Logged schema versions
+- Logged idempotency metadata
 - Replay on startup
 - Truncated-tail recovery
 
@@ -295,6 +317,12 @@ Core API:
 - `health`
 - `current_revision`
 
+Initial transport:
+
+- Embedded API for tests
+- CLI command runner for local usage
+- Network API before comparative load/stress testing
+
 Optional QL:
 
 ```text
@@ -305,7 +333,7 @@ EXPLAIN user:kien CAN view document:doc1;
 
 ### Deliverable
 
-Usable local Veriqik server or embedded engine.
+Usable local Veriqik engine via embedded API and CLI, with a network transport added before comparative benchmarking.
 
 ---
 
@@ -320,6 +348,8 @@ Usable local Veriqik server or embedded engine.
 - `memo_misses`
 - `max_depth`
 - `elapsed_ns`
+- failed-closed status counts
+- health state transitions
 
 ### Deliverable
 
@@ -362,6 +392,11 @@ MVP 1 is complete when:
 - Explain-one produces a valid proof
 - Batch check shares memoized subproblems
 - Invalid tuples are rejected by schema validation
+- Public checks reject relation targets
+- Failed-closed results are distinguishable from denial
+- Idempotent retry returns the original revision
+- Canonical command hashing is deterministic
+- Checks and batch checks observe stable evaluated revisions
 
 ---
 
@@ -372,7 +407,10 @@ MVP 1 is complete when:
 - Permissions are compiled programs, not stored edges
 - Writes target relations
 - Checks target permissions
+- Schema and dictionary changes are logged state-machine changes
+- Retried writes with the same request ID are idempotent
+- Canonical command encoding defines idempotency identity
 - A committed batch is atomic
 - Revisions are monotonic
 - Traversal is bounded
-- Authorization uncertainty fails closed
+- Authorization uncertainty fails closed and is distinguishable from clean denial

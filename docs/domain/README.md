@@ -1,27 +1,21 @@
 # Domain Documentation
 
-Start with [Domain_Language.md](Domain_Language.md).
+Start with [Domain_Language.md](Domain_Language.md), then read [Domain_Model.md](Domain_Model.md) when working on DDD ownership, aggregates, or service boundaries.
 
-The domain language document is currently the single source for:
+## Documents
+
+| Document | Purpose |
+|---|---|
+| [Domain_Language.md](Domain_Language.md) | Ubiquitous language, vocabulary, anti-corruption terms, naming rules, invariants |
+| [Domain_Model.md](Domain_Model.md) | DDD entities, value objects, aggregates, consistency boundaries, domain services |
+
+## Domain Language Covers
 
 - ubiquitous language
 - DDD bounded contexts
 - core authorization vocabulary
 - database vocabulary
 - distributed database vocabulary
-- DDD entities, value objects, aggregates, and domain services
 - anti-corruption language
 - naming rules
 - invariants
-
-## Future Split
-
-If the document becomes harder to maintain, split it into:
-
-- `Ubiquitous_Language.md`
-- `DDD_Model.md`
-- `Distributed_Domain.md`
-- `Naming_Conventions.md`
-
-Until then, keep `Domain_Language.md` as the authoritative vocabulary source.
-

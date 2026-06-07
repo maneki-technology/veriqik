@@ -6,6 +6,8 @@ This document defines Veriqik's ubiquitous language. Product docs, technical spe
 
 Veriqik is a domain-specific database for Fine-Grained Authorization (FGA) using Relationship-Based Access Control (ReBAC). It is Zanzibar-inspired at the model level and TigerBeetle-inspired at the database level, but it uses its own domain language and DSL.
 
+For DDD entities, value objects, aggregates, and domain services, see [Domain_Model.md](Domain_Model.md).
+
 ---
 
 ## 1. Bounded Contexts
@@ -152,6 +154,69 @@ Rules:
 - Permissions do not create extra graph hops by default.
 - Permissions are planning, caching, profiling, and explainability units.
 
+### Caveat
+
+A future conditional rule that makes a relationship or permission branch depend on request context.
+
+Examples of caveat inputs:
+
+- time
+- IP range
+- device posture
+- tenant policy flags
+- application-provided request attributes
+
+Rules:
+
+- Caveats are deferred from MVP 1.
+- Unsupported caveated schemas or tuples must fail closed.
+- Caveats require context-aware check inputs, cache keys, evaluation, and explanations.
+
+### Conditional Permission
+
+A future permission whose result may depend on caveats or request context.
+
+MVP 1 permissions are context-free: they depend only on schema-defined ReBAC relationships and compiled permission expressions.
+
+### Request Context
+
+Structured values supplied with a check request for future caveat evaluation.
+
+Examples:
+
+- request time
+- source IP
+- device attributes
+- application attributes
+
+Rules:
+
+- Request context is deferred from MVP 1.
+- Request context must be normalized before it can participate in cache keys or explanations.
+
+### Condition Context
+
+The subset of request context visible to a specific caveat or conditional permission branch.
+
+Rule:
+
+- Missing, malformed, or unsupported condition context must fail closed when a condition is required.
+
+### Context-Free Check
+
+A check whose result depends only on stored relationships, schema programs, and the selected revision.
+
+MVP 1 checks are context-free.
+
+### Context-Aware Check
+
+A future check whose result may also depend on request context and caveat evaluation.
+
+Rules:
+
+- Context-aware checks are deferred from MVP 1.
+- Context-aware checks require context-aware memoization, cache keys, and explanations.
+
 ### Tuple
 
 A durable relationship fact.
@@ -175,6 +240,26 @@ Rules:
 - A tuple must target a relation, not a permission.
 - A tuple must satisfy the active schema.
 - A tuple is tenant-scoped.
+
+### Grant
+
+A write that creates access or contributes to a proof path for access.
+
+Rules:
+
+- A grant may be direct, such as adding `document:doc1#viewer@user:kien`.
+- A grant may be indirect, such as adding `group:eng#member@user:kien` when `group:eng#member` is already a viewer.
+- Read-after-grant uses the revision returned by the grant write.
+
+### Revoke
+
+A delete or schema change that removes access or removes a proof path for access.
+
+Rules:
+
+- A revoke may be direct, such as deleting `document:doc1#viewer@user:kien`.
+- A revoke may be indirect, such as deleting `group:eng#member@user:kien`.
+- Read-after-revoke uses the revision returned by the revoke write.
 
 ### Userset
 
@@ -279,8 +364,8 @@ The engine could not safely return authorization because state or evaluation was
 Examples:
 
 - traversal limit exceeded
-- node limit exceeded
-- edge limit exceeded
+- evaluation node limit exceeded
+- evaluation edge limit exceeded
 - requested revision unavailable
 - storage unhealthy
 - fatal recovery/corruption state
@@ -309,8 +394,8 @@ Execution measurements collected during check/eval.
 
 Examples:
 
-- nodes visited
-- edges scanned
+- evaluation nodes visited
+- evaluation edges scanned
 - index lookups
 - memo hits
 - memo misses
@@ -325,6 +410,8 @@ Examples:
 
 A typed operation submitted to the state machine.
 
+Veriqik uses `command` for state-machine requests. A command may be a write command or a read operation.
+
 MVP commands:
 
 - `write_schema`
@@ -337,6 +424,28 @@ MVP commands:
 - `current_revision`
 
 Only write commands mutate durable state.
+
+### Write Command
+
+A command that mutates durable authorization state and receives a revision if committed.
+
+Examples:
+
+- `write_schema`
+- `write_relationships`
+- `delete_relationships`
+
+### Read Operation
+
+A non-mutating API operation that evaluates or reports committed state.
+
+Examples:
+
+- `check`
+- `batch_check`
+- `explain_one`
+- `health`
+- `current_revision`
 
 ### Command Batch
 
@@ -479,6 +588,8 @@ MVP health states:
 ## 5. Distributed Database Terms
 
 Distributed database terms are post-MVP vocabulary, but they should use the same domain language from the beginning.
+
+These terms reserve language for future distributed design. They are not MVP 1 requirements unless referenced by an MVP spec or ADR.
 
 ### Server
 
@@ -731,184 +842,7 @@ Rules:
 
 ---
 
-## 6. DDD Classification
-
-### Entities
-
-Entities have identity and lifecycle.
-
-- Tenant
-- Schema Version
-- Tuple
-- Command Batch
-- WAL Record
-- Checkpoint
-- Server
-- Replica
-- Shard
-- Leadership Epoch
-
-### Value Objects
-
-Value objects are immutable, comparable by value, and safe to use as keys.
-
-- Type ID
-- Object ID
-- Relation ID
-- Permission ID
-- Subject Key
-- Object Relation Key
-- Tuple Key
-- Eval Target
-- Revision
-- Revision Token
-- Request ID
-- Check Limits
-
-### Aggregates
-
-Aggregates define consistency boundaries.
-
-### Tenant Authorization State
-
-Root:
-
-```text
-Tenant
-```
-
-Contains:
-
-- active schema version
-- dictionaries
-- tuples
-- indexes
-- current revision
-- idempotency table
-
-Consistency rules:
-
-- no cross-tenant tuples
-- tuple validates against active schema
-- indexes reflect tuple state
-- revisions are monotonic
-
-### Schema Registry
-
-Root:
-
-```text
-Schema Version
-```
-
-Contains:
-
-- compiled type definitions
-- relation definitions
-- permission programs
-- tombstoned names
-
-Consistency rules:
-
-- relation and permission names do not collide within a type
-- traversals resolve
-- permission expressions compile
-- schema changes preserve existing tuple validity
-
-### Storage Log
-
-Root:
-
-```text
-WAL
-```
-
-Contains:
-
-- ordered WAL records
-- checkpoint boundary
-- segment metadata
-
-Consistency rules:
-
-- revisions are contiguous
-- checksums verify
-- record order is deterministic
-- checkpoint revision is a prefix of applied WAL state
-
-### Replicated Shard
-
-Root:
-
-```text
-Shard
-```
-
-Contains:
-
-- replicas
-- leader
-- leadership epoch
-- consensus log
-- committed revision
-- placement metadata
-
-Consistency rules:
-
-- one leader per shard epoch
-- committed revisions are ordered and durable by quorum
-- replicas apply committed revisions in order
-- published revision never exceeds applied revision
-- checks are served only from published revisions
-
-### Replica State
-
-Root:
-
-```text
-Replica
-```
-
-Contains:
-
-- committed revision known to the replica
-- applied revision
-- published revision
-- local schema registry
-- local dictionaries
-- local indexes
-- catch-up state
-
-Consistency rules:
-
-- applied revision never exceeds committed revision known to the replica
-- published revision never exceeds applied revision
-- a replica may answer `at_least(N)` only when `published_revision >= N`
-
-### Domain Services
-
-Domain services implement behavior that does not naturally belong to one entity.
-
-- Schema Compiler
-- Schema Compatibility Validator
-- Command Canonicalizer
-- Relationship Writer
-- Relationship Deleter
-- Check Evaluator
-- Batch Check Evaluator
-- Explain-One Builder
-- Recovery Service
-- Checkpoint Writer
-- WAL Verifier
-- Replication Service
-- Leader Election Service
-- Shard Router
-- Catch-Up Service
-- Snapshot Shipping Service
-
----
-
-## 7. Anti-Corruption Language
+## 6. Anti-Corruption Language
 
 Veriqik should avoid importing external terminology when it weakens the domain model.
 
@@ -919,6 +853,8 @@ Veriqik should avoid importing external terminology when it weakens the domain m
 | relation | stored permission | Relations are stored tuple-backed edges. |
 | permission | computed relation | Permissions are compiled programs. |
 | tuple | policy row | Tuples are relationship facts, not generic policy rows. |
+| grant | generic write | Grant names the authorization effect of creating access. |
+| revoke | generic delete | Revoke names the authorization effect of removing access. |
 | check | query | Check has authorization-specific semantics. |
 | eval | public check | Eval is internal only. |
 | failed closed | denied | Failed closed means uncertainty, not clean denial. |
@@ -936,12 +872,16 @@ Veriqik should avoid importing external terminology when it weakens the domain m
 | Zanzibar userset | userset |
 | OpenFGA relation used as computed access | permission, if computed |
 | OpenFGA tuple store | relationship storage, but not the whole database |
+| SpiceDB definition | type |
+| SpiceDB relation | relation |
+| SpiceDB permission | permission |
+| SpiceDB caveat | caveat, deferred from MVP 1 |
 | policy engine decision | check result |
 | consensus log entry | replicated command batch |
 
 ---
 
-## 8. Naming Rules
+## 7. Naming Rules
 
 ### Public API Names
 
@@ -989,7 +929,7 @@ Examples:
 
 ---
 
-## 9. Invariants in Domain Language
+## 8. Invariants in Domain Language
 
 - Writes target relations.
 - Checks target permissions.
@@ -1006,5 +946,5 @@ Examples:
 - A replica may answer a check only at a revision it has fully applied and published.
 - Committed does not imply queryable on every replica; applied and published do.
 - A replica that cannot satisfy a minimum revision must wait, redirect, or reject.
-- Read-after-revoke requires checks to evaluate at least the revocation revision.
+- Read-after-grant and read-after-revoke require checks to evaluate at least the relevant write revision.
 - Split brain is fatal to authorization correctness and must be prevented.

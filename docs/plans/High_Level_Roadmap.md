@@ -1,4 +1,4 @@
-# Veriqik Ideal State Plan
+# Veriqik High-Level Roadmap
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
@@ -8,7 +8,7 @@
 
 Veriqik is a domain-specific authorization database for Fine-Grained Authorization (FGA) and Relationship-Based Access Control (ReBAC).
 
-It is TigerBeetle-inspired in its database posture: a narrow command surface, deterministic state-machine execution, durable log as source of truth, derived indexes, explicit batching, bounded work, and rigorous recovery semantics.
+It borrows database design discipline from TigerBeetle: a narrow command surface, deterministic state-machine execution, durable log as source of truth, derived indexes, explicit batching, bounded work, and rigorous recovery semantics.
 
 It combines:
 
@@ -22,7 +22,7 @@ It combines:
 
 ---
 
-## 2. Key Differentiator
+## 2. Core Semantic Model
 
 Veriqik separates tuple-backed relations from computed permissions.
 
@@ -31,7 +31,9 @@ relation viewer: user | group#member
 permission view = viewer + editor + parent.view
 ```
 
-This enables permission-level:
+This is an important semantic choice and matches the direction of mature systems such as SpiceDB/Zed. It is not the primary differentiator by itself.
+
+In Veriqik, the relation/permission split enables permission-level:
 
 - Planning
 - Indexing
@@ -43,11 +45,29 @@ This enables permission-level:
 
 Permissions do not create extra graph hops by default. They compile into execution programs.
 
-The schema language is Veriqik-native from day one. Zanzibar informs the ReBAC model, but Veriqik does not aim to clone Zanzibar/OpenFGA syntax or collapse permissions into relations.
+The schema language is Veriqik-native from day one and Zed-inspired, but Veriqik does not aim to clone SpiceDB/Zed, Zanzibar, or OpenFGA syntax.
+
+## 3. Product Differentiator
+
+Veriqik's main differentiator is its database design.
+
+The product bet is that authorization logic, relationship storage, indexing, revisions, recovery, and check execution belong inside one purpose-built authorization database.
+
+Database-design differentiators:
+
+- narrow command surface
+- deterministic state-machine execution
+- WAL/checkpoints as database-owned recovery primitives
+- derived authorization indexes rebuilt from durable state
+- explicit batching and bounded work
+- no internal FGA-to-DB network hop during check/eval
+- revision-first consistency for read-after-grant and read-after-revoke
+- failed-closed behavior as a database contract
+- benchmarkable check/eval hot paths over native data structures
 
 ---
 
-## 3. High-Level Architecture
+## 4. High-Level Architecture
 
 ```mermaid
 flowchart TD
@@ -77,7 +97,7 @@ flowchart TD
 
 ---
 
-## 4. Roadmap Overview
+## 5. Roadmap Overview
 
 | Phase | Name | Purpose |
 |---:|---|---|

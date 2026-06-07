@@ -12,7 +12,7 @@ This directory contains the product, domain, and technical design docs for Veriq
 2. [Architecture Decision Records](adrs/README.md)
    Records proposed, accepted, and superseded architectural decisions.
 
-3. [Ideal State Plan](plans/Ideal_State.md)
+3. [High-Level Roadmap](plans/High_Level_Roadmap.md)
    Describes the long-term product direction and phased roadmap.
 
 4. [MVP 1 Plan](plans/MVP1.md)

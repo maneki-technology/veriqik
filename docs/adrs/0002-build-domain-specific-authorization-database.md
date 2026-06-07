@@ -10,6 +10,8 @@ Veriqik will be built as a domain-specific database for fine-grained authorizati
 
 Veriqik will own authorization-specific schema semantics, relationship storage, indexes, revisions, checks, explanations, recovery, and eventually replication.
 
+The FGA domain engine will not call a separate database over the network for normal check/eval execution. Checks, evaluation, indexes, WAL, checkpoints, and revision state are part of the same local database boundary. Network APIs may exist for clients and benchmarks, but not as the internal boundary between authorization logic and storage.
+
 ## Context
 
 Fine-grained authorization using ReBAC has domain-specific needs:
@@ -44,6 +46,7 @@ The main gaps Veriqik intends to close are:
 - **Native relation/permission split:** `relation` is a stored edge; `permission` is a compiled authorization program.
 - **Engine-oriented DSL:** Veriqik can borrow proven Zed concepts while compiling schemas into Veriqik-owned AST, planner, evaluator, index, memoization, and explanation structures.
 - **Database-owned authorization state:** WAL, checkpoints, indexes, revisions, health, and recovery are part of one authorization state machine.
+- **No internal FGA-to-DB network hop:** check/eval should execute against local Veriqik state, not through a separate storage service API.
 - **Revision-first consistency:** checks should report evaluated revisions, and future distributed reads should use revision tokens for read-after-revoke.
 - **Failed-closed semantics:** authorization uncertainty should be distinguishable from clean denial.
 - **Core explainability and profiling:** proof paths, stats, and eventually branch-level performance data should be part of the database contract.
@@ -58,6 +61,7 @@ Veriqik trades that flexibility for specialization:
 
 - native authorization indexes derived from WAL/checkpoints
 - check hot paths over binary keys instead of generic datastore rows
+- no internal network hop between the authorization evaluator and storage/index state
 - permission-aware planning and profiling
 - revision-aware memoization and caching
 - batch-first evaluation with shared memoized subproblems

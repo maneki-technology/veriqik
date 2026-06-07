@@ -36,7 +36,7 @@ The proposed direction is to reuse the mature ideas, not the compatibility contr
 - `relation` means stored relationship edge
 - `permission` means compiled authorization program
 - common operators should feel familiar
-- advanced features can be deferred until the engine needs them
+- advanced features, including caveats, can be deferred until the engine needs them
 - explanations, failed-closed behavior, and revision semantics remain Veriqik-owned
 
 ## Consequences

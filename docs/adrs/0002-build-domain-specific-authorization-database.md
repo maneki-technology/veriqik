@@ -47,7 +47,7 @@ The main gaps Veriqik intends to close are:
 - **Engine-oriented DSL:** Veriqik can borrow proven Zed concepts while compiling schemas into Veriqik-owned AST, planner, evaluator, index, memoization, and explanation structures.
 - **Database-owned authorization state:** WAL, checkpoints, indexes, revisions, health, and recovery are part of one authorization state machine.
 - **No internal FGA-to-DB network hop:** check/eval should execute against local Veriqik state, not through a separate storage service API.
-- **Revision-first consistency:** checks should report evaluated revisions, and future distributed reads should use revision tokens for read-after-revoke.
+- **Revision-first consistency:** checks should report evaluated revisions, and future distributed reads should use revision tokens for read-after-grant and read-after-revoke.
 - **Failed-closed semantics:** authorization uncertainty should be distinguishable from clean denial.
 - **Core explainability and profiling:** proof paths, stats, and eventually branch-level performance data should be part of the database contract.
 

@@ -14,7 +14,7 @@ If a replica cannot satisfy the requested minimum revision, it must wait, redire
 
 Authorization systems have a safety problem that many generic read-heavy systems can avoid: stale reads after revocation can incorrectly grant access.
 
-Veriqik's distributed design needs explicit language for read-after-write and read-after-revoke behavior.
+Veriqik's distributed design needs explicit language for read-after-grant and read-after-revoke behavior.
 
 ## Considered Options
 
@@ -37,7 +37,7 @@ A replica that has not published that revision cannot safely answer.
 ## Consequences
 
 - During partitions, some writes or fresh reads may become unavailable.
-- Clients can enforce read-after-revoke using revision tokens.
+- Clients can enforce read-after-grant and read-after-revoke using revision tokens.
 - Future follower reads must check published revision before answering.
 - Availability-oriented modes must be explicit and opt-in.
 

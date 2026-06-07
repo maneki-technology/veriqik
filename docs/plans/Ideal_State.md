@@ -88,7 +88,7 @@ flowchart TD
 | 4 | Performance Analysis and Benchmarking | Compare with existing systems |
 | 5 | Performance Optimization | Optimize based on measurements |
 | 6 | Replication and Consensus | Fault-tolerant replicated log |
-| 7 | Distributed Revisions | Strong read-after-write across replicas |
+| 7 | Distributed Revisions | Strong read-after-grant and read-after-revoke across replicas |
 | 8 | Sharding and Multi-Tenant Scale | Scale beyond one write stream |
 | 9 | Extended Authorization Semantics | Caveats, wildcards, context |
 | 10 | Materialized Authorization | Selective effective permission indexes |
@@ -403,7 +403,7 @@ Durable replicated authorization history.
 
 ### Goal
 
-Support read-after-write and read-after-revoke in replicated systems.
+Support read-after-grant and read-after-revoke in replicated systems.
 
 ### Concepts
 

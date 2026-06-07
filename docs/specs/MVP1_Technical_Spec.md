@@ -1759,5 +1759,5 @@ MVP 1 is successful when:
 7. It can answer parent inheritance checks.
 8. It can explain one successful proof path.
 9. It prevents infinite traversal from cycles.
-10. It supports revision-aware read-after-write.
+10. It supports revision-aware read-after-grant and read-after-revoke.
 ```

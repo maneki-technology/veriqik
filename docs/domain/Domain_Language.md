@@ -611,7 +611,7 @@ rev_1050
 
 Rules:
 
-- Clients use revision tokens to enforce read-after-write and read-after-revoke.
+- Clients use revision tokens to enforce read-after-grant and read-after-revoke.
 - Revision tokens are logical consistency tokens, not wall-clock timestamps.
 
 ### Minimum Revision
@@ -632,6 +632,12 @@ Rules:
 ### Read-After-Write
 
 A guarantee that a client can read the effects of a successful write by requiring at least the write's returned revision.
+
+This is the generic database term. Authorization-facing docs should prefer the more specific terms read-after-grant and read-after-revoke.
+
+### Read-After-Grant
+
+A guarantee that a client can observe newly granted access by requiring at least the grant write's returned revision.
 
 ### Read-After-Revoke
 
@@ -719,7 +725,7 @@ leader_only
 
 Rules:
 
-- `at_least(revision)` is the core safety mode for read-after-write and read-after-revoke.
+- `at_least(revision)` is the core safety mode for read-after-grant and read-after-revoke.
 - `leader_only` may be useful for sensitive checks or operational debugging.
 - `bounded_staleness` is an optimization mode, not a substitute for revocation freshness.
 

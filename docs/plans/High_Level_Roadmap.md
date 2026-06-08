@@ -69,35 +69,44 @@ Database-design differentiators:
 
 ## 4. High-Level Architecture
 
+Diagram notation:
+
+- Rounded boxes are external actors or returned results.
+- Rectangular boxes are execution components.
+- Cylinder boxes are durable or derived database state.
+- Arrow labels define the relationship. They do not imply network calls unless the arrow crosses the public API boundary.
+
 ```mermaid
 flowchart TD
-    Client[Client SDK / App] --> API[FGA API / QL Gateway]
+    Client([Client SDK / App]) -->|request| API[Public API / QL Gateway]
 
-    API --> CommandIR[Typed Command IR]
-    API --> Parser[Schema + QL Parser]
+    API -->|build command| CommandIR[Typed Command IR]
+    API -->|parse text| Parser[Schema + QL Parser]
 
-    Parser --> Compiler[Schema Compiler]
-    Compiler --> SchemaStore[Compiled Schema Store]
+    Parser -->|validated AST| Compiler[Schema Compiler]
+    Compiler -->|stores program| SchemaStore[(Compiled Schema Store)]
 
-    CommandIR --> Engine[Authorization State Machine]
+    CommandIR -->|execute| Engine[Authorization State Machine]
 
-    Engine --> Log[WAL / Consensus Log]
-    Engine --> Indexes[Materialized Tuple Indexes]
-    Engine --> Revision[Revision Manager]
-    Engine --> CheckEngine[Check / Explain Engine]
+    Engine -->|append writes| Log[(WAL / Consensus Log)]
+    Engine -->|update derived state| Indexes[(Authorization Indexes)]
+    Engine -->|publish revision| Revision[(Revision State)]
+    Engine -->|evaluate read command| CheckEngine[Check / Explain Engine]
 
-    Log --> Snapshot[Checkpoints / Snapshots]
-    SchemaStore --> CheckEngine
-    Indexes --> CheckEngine
-    Revision --> CheckEngine
+    Log -->|compact later| Snapshot[(Checkpoints / Snapshots)]
+    SchemaStore -->|read| CheckEngine
+    Indexes -->|read| CheckEngine
+    Revision -->|read| CheckEngine
 
-    CheckEngine --> Result[Decision / Proof / Stats]
-    Result --> Client
+    CheckEngine -->|return| Result([Decision / Proof / Stats])
+    Result -->|response| Client
 ```
 
 ---
 
 ## 5. Roadmap Overview
+
+The high-level architecture diagram above uses the formal box and arrow notation. Phase diagrams below are smaller roadmap sketches; their arrows mean phase-local transformation, dependency, or sequencing as described by the surrounding section.
 
 | Phase | Name | Purpose |
 |---:|---|---|

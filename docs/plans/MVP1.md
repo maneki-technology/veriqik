@@ -102,36 +102,45 @@ In MVP 1:
 
 ## 4. MVP 1 Architecture
 
+Diagram notation:
+
+- Rounded boxes are external actors or returned results.
+- Rectangular boxes are execution components.
+- Cylinder boxes are durable or derived database state.
+- Arrow labels define the relationship. They do not imply network calls unless the arrow crosses the public API boundary.
+
 ```mermaid
 flowchart TD
-    Client[Embedded Tests / CLI / Future Network API] --> API[Public API Boundary]
-    API --> Command[Typed Command IR]
-    Command --> Engine[Single-Node Authorization State Machine]
+    Client([Embedded Tests / CLI / Future Network API]) -->|request| API[Public API Boundary]
+    API -->|build command| Command[Typed Command IR]
+    Command -->|execute| Engine[Single-Node Authorization State Machine]
 
-    Engine --> WAL[Append-Only WAL]
-    Engine --> Revision[Revision Manager]
-    Engine --> Schema[Compiled Schema Registry]
-    Engine --> Dictionary[Stable Dictionaries]
-    Engine --> Exists[Exists Index]
-    Engine --> Forward[Forward Index]
-    Engine --> Reverse[Reverse Index]
+    Engine -->|append writes| WAL[(Append-Only WAL)]
+    Engine -->|publish revision| Revision[(Revision State)]
+    Engine -->|update schema| Schema[(Compiled Schema Registry)]
+    Engine -->|allocate names| Dictionary[(Stable Dictionaries)]
+    Engine -->|update tuple existence| Exists[(Exists Index)]
+    Engine -->|update object-to-subject lookup| Forward[(Forward Index)]
+    Engine -->|update subject-to-object lookup| Reverse[(Reverse Index)]
+    Engine -->|evaluate read command| Check[Check / Batch Check Engine]
 
-    WAL --> Recovery[Recovery / Full WAL Replay]
-    Recovery --> Revision
-    Recovery --> Schema
-    Recovery --> Dictionary
-    Recovery --> Exists
-    Recovery --> Forward
-    Recovery --> Reverse
+    WAL -->|replay on startup| Recovery[Recovery / Full WAL Replay]
+    Recovery -->|rebuild| Revision
+    Recovery -->|rebuild| Schema
+    Recovery -->|rebuild| Dictionary
+    Recovery -->|rebuild| Exists
+    Recovery -->|rebuild| Forward
+    Recovery -->|rebuild| Reverse
 
-    Schema --> Check[Check / Batch Check Engine]
-    Dictionary --> Check
-    Revision --> Check
-    Exists --> Check
-    Forward --> Check
-    Reverse --> Check
+    Schema -->|read| Check
+    Dictionary -->|read| Check
+    Revision -->|read| Check
+    Exists -->|read| Check
+    Forward -->|read| Check
+    Reverse -->|read| Check
 
-    Check --> Explain[Explain-One / Stats]
+    Check -->|produce| Explain([Decision / Explain-One / Stats])
+    Explain -->|response| Client
 ```
 
 ---

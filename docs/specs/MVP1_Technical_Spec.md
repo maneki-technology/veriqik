@@ -78,7 +78,6 @@ The [MVP 1 Plan](../plans/MVP1.md) owns product scope and milestone order. This 
 
 - Single-node engine
 - Durable WAL
-- Checkpoints
 - Tuple writes/deletes
 - Schema DSL
 - Compiled permission programs
@@ -109,6 +108,8 @@ The [MVP 1 Plan](../plans/MVP1.md) owns product scope and milestone order. This 
 - Custom LSM
 - Production network protocol
 - Full graph QL
+- Periodic checkpoints
+- Request-id based write idempotency
 
 ---
 
@@ -116,23 +117,34 @@ The [MVP 1 Plan](../plans/MVP1.md) owns product scope and milestone order. This 
 
 ```mermaid
 flowchart TD
-    API[API / CLI / QL] --> Commands[Typed Commands]
-    Commands --> StateMachine[Single-Node State Machine]
+    Client[Embedded Tests / CLI / Future Network API] --> API[Public API Boundary]
+    API --> Command[Typed Command IR]
+    Command --> Engine[Single-Node Authorization State Machine]
 
-    StateMachine --> WAL[WAL]
-    StateMachine --> Revision[Revision Manager]
-    StateMachine --> SchemaRegistry[Schema Registry]
-    StateMachine --> Exists[Exists Index]
-    StateMachine --> Forward[Forward Index]
-    StateMachine --> Reverse[Reverse Index]
+    Engine --> WAL[Append-Only WAL]
+    Engine --> Revision[Revision Manager]
+    Engine --> Schema[Compiled Schema Registry]
+    Engine --> Dictionary[Stable Dictionaries]
+    Engine --> Exists[Exists Index]
+    Engine --> Forward[Forward Index]
+    Engine --> Reverse[Reverse Index]
 
-    SchemaRegistry --> CheckEngine[Check Engine]
-    Exists --> CheckEngine
-    Forward --> CheckEngine
-    Reverse --> CheckEngine
+    WAL --> Recovery[Recovery / Full WAL Replay]
+    Recovery --> Revision
+    Recovery --> Schema
+    Recovery --> Dictionary
+    Recovery --> Exists
+    Recovery --> Forward
+    Recovery --> Reverse
 
-    CheckEngine --> Explain[Explain-One]
-    WAL --> Recovery[Recovery]
+    Schema --> Check[Check / Batch Check Engine]
+    Dictionary --> Check
+    Revision --> Check
+    Exists --> Check
+    Forward --> Check
+    Reverse --> Check
+
+    Check --> Explain[Explain-One / Stats]
 ```
 
 ---
@@ -148,7 +160,6 @@ MVP 1 follows these database rules:
 - The WAL is the source of truth.
 - All indexes are derived from logged state and are rebuildable.
 - Replay of the same WAL must produce the same schema registry, dictionaries, indexes, and revision.
-- Request retries are idempotent when `request_id` is supplied.
 - Checks are bounded computations over a published revision.
 - Authorization uncertainty fails closed and is reported separately from a clean denial.
 - The initial transport can be embedded tests and CLI; a network API is required before load/stress comparisons with external products.
@@ -264,7 +275,7 @@ Rules:
 - A name maps to the same numeric ID for the lifetime of the tenant.
 - IDs are never reused in MVP 1, even if a later schema removes a type, relation, or permission.
 - Recovery must not allocate IDs by parsing in-memory state differently; it replays logged dictionary allocations.
-- Checkpoints persist dictionaries as part of state, but WAL replay remains authoritative after the checkpoint revision.
+- Future checkpoints must persist dictionaries as part of state, but MVP 1 recovery replays the WAL as the authoritative source.
 
 ---
 
@@ -515,7 +526,6 @@ const WriteSchemaCommand = struct {
     tenant_id: u64,
     schema_text: []const u8,
     expected_schema_version: ?u64,
-    request_id: ?RequestId,
 };
 ```
 
@@ -527,7 +537,6 @@ const WriteRelationshipsCommand = struct {
     writes: []TupleKey,
     preconditions: []Precondition,
     expected_schema_version: ?u64,
-    request_id: ?RequestId,
 };
 ```
 
@@ -539,7 +548,6 @@ const DeleteRelationshipsCommand = struct {
     deletes: []TupleKey,
     preconditions: []Precondition,
     expected_schema_version: ?u64,
-    request_id: ?RequestId,
 };
 ```
 
@@ -554,18 +562,17 @@ const Precondition = union(enum) {
 
 ### Canonical Commands
 
-Every write command is converted to a canonical form before idempotency checks and WAL encoding.
+Every write command is converted to a canonical form before WAL encoding.
 
 Canonicalization rules:
 
 - Resolve all human names to stable numeric IDs before validation completes.
-- Encode command type, tenant ID, expected schema version, tuple keys, preconditions, schema text hash, dictionary allocations, and request ID in fixed field order.
+- Encode command type, tenant ID, expected schema version, tuple keys, preconditions, schema text hash, and dictionary allocations in fixed field order.
 - Tuple keys are sorted by their binary key order.
 - Preconditions are sorted by `(kind, TupleKey)`.
 - Duplicate tuple keys inside one write or delete list are rejected with `DUPLICATE_TUPLE_IN_BATCH`.
 - Duplicate preconditions inside one command are deduped before hashing.
 - Schema text is normalized by parsing and re-emitting the AST in canonical order before hashing.
-- The idempotency payload hash is computed from the canonical command excluding `request_id`.
 - WAL payloads use the canonical command representation.
 
 ### Relationship Write Semantics
@@ -591,16 +598,9 @@ Rules:
 
 ### Request Idempotency
 
-`request_id` makes write commands safe to retry after timeout or connection loss.
+Request-id based write idempotency is deferred to Operational Readiness.
 
-Rules:
-
-- `request_id` is scoped by `(tenant_id, command_type)`.
-- If the same request ID and identical canonical payload are received again, return the original result, including revision and schema version.
-- If the same request ID is reused with a different canonical payload, reject with `REQUEST_ID_CONFLICT`.
-- Dedupe records are durable state and must be checkpointed.
-- Dedupe records may be compacted only after a documented retention window. MVP 1 may use an unbounded in-memory-plus-checkpoint map for simplicity.
-- Commands without `request_id` are not idempotent beyond normal tuple/precondition validation.
+MVP 1 still canonicalizes write commands for deterministic WAL encoding and tests, but it does not retain request IDs or dedupe retry results.
 
 ---
 
@@ -649,7 +649,6 @@ Rules:
 - Checks must see a stable state for their captured revision.
 - MVP 1 may implement this with a single reader-writer lock around in-memory state.
 - If lock-free or copy-on-write indexes are introduced later, they must preserve the same visible snapshot contract.
-- Checkpointing must snapshot a stable revision and must not block published checks longer than an implementation-defined limit.
 - During recovery, public command handling is unavailable and `health` reports `recovering`.
 
 ---
@@ -659,7 +658,7 @@ Rules:
 MVP 1 storage:
 
 ```text
-WAL + in-memory indexes + periodic checkpoints
+WAL + in-memory derived state
 ```
 
 ### Storage Layout
@@ -669,27 +668,19 @@ Default data directory:
 ```text
 veriqik-data/
   LOCK
-  CURRENT
   wal/
     wal_0000000000000001.log
     wal_0000000000000002.log
-  checkpoints/
-    checkpoint_0000000000001050.snapshot
-    checkpoint_0000000000002050.snapshot
   tmp/
 ```
 
 Rules:
 
 - `LOCK` prevents multiple Veriqik processes from opening the same data directory for writes.
-- `CURRENT` records the newest checkpoint revision and WAL segment generation known to be durable.
 - WAL files are append-only segments.
 - WAL segment names are monotonically increasing.
-- Checkpoint filenames include the checkpoint revision.
 - Temporary files must be written under `tmp/` or with a `.tmp` suffix and atomically renamed.
 - Segment rotation is based on an implementation-defined maximum WAL segment size.
-- WAL segments older than the newest retained checkpoint may be deleted only after the checkpoint and `CURRENT` are fsynced.
-- MVP 1 keeps at least the last two valid checkpoints.
 
 ### WAL Record
 
@@ -711,7 +702,7 @@ WAL format rules:
 - A complete record is accepted only if magic, length, checksum, command type, and revision order are valid.
 - A partial tail record can be truncated during recovery.
 - A corrupt middle record is fatal until repaired or restored.
-- WAL payloads include dictionary allocations, schema versions, command payload, and idempotency metadata needed for deterministic replay.
+- WAL payloads include dictionary allocations, schema versions, and command payloads needed for deterministic replay.
 
 ### Safe Write Path
 
@@ -720,14 +711,13 @@ WAL format rules:
 2. Canonicalize command and resolve dictionary IDs
 3. Validate schema
 4. Validate preconditions
-5. Check request idempotency
-6. Assign revision
-7. Encode WAL record with dictionary/idempotency metadata
-8. Append WAL record
-9. fsync / group commit
-10. Apply to indexes
-11. Publish current_revision
-12. Return success
+5. Assign revision
+6. Encode WAL record with dictionary metadata
+7. Append WAL record
+8. fsync / group commit
+9. Apply to indexes
+10. Publish current_revision
+11. Return success
 ```
 
 ### Failure Rule
@@ -758,7 +748,6 @@ Initial limit categories:
 - max WAL segment bytes
 - max concurrent checks
 - max queued write commands
-- max checkpoint duration before health reports degraded
 
 Rules:
 
@@ -775,47 +764,22 @@ Rules:
 Startup:
 
 ```text
-1. Load latest valid checkpoint if present
-2. Replay WAL records after checkpoint
-3. Verify checksum and revision order
-4. Stop at first incomplete tail record
-5. Truncate invalid tail if safe
-6. Rebuild indexes
+1. Replay WAL records from the beginning
+2. Verify checksum and revision order
+3. Stop at first incomplete tail record
+4. Truncate invalid tail if safe
+5. Rebuild indexes
 ```
 
 Middle corruption is fatal until restored or repaired.
 
 ---
 
-## 15. Checkpoints
+## 15. Deferred Checkpoints
 
-Checkpoint contains:
+Checkpoints are deferred to Operational Readiness.
 
-- current revision
-- schema registry
-- dictionaries
-- exists index
-- forward index
-- reverse index
-- request idempotency table
-
-Safe checkpoint write:
-
-```text
-1. write checkpoint_N.tmp
-2. fsync file
-3. rename to checkpoint_N.snapshot
-4. fsync directory
-5. keep last 2 or 3 checkpoints
-```
-
-Checkpoint/WAL boundary rules:
-
-- A checkpoint has a single `checkpoint_revision`.
-- It contains all state after applying every WAL record up to and including `checkpoint_revision`.
-- Recovery loads the newest valid checkpoint, then replays only records with `revision > checkpoint_revision`.
-- Checkpoint checksum covers the serialized checkpoint payload and metadata.
-- A checkpoint never replaces the WAL as the source of truth for revisions after the checkpoint.
+MVP 1 recovery replays the full WAL and rebuilds derived state. Future checkpoints should provide faster restart, checkpoint verification, WAL retention/compaction boundaries, and backup/restore integration.
 
 ---
 
@@ -1191,7 +1155,6 @@ const HealthState = enum {
     recovering,
     healthy,
     read_only_storage_error,
-    degraded_checkpoint,
     fatal_corruption,
     shutting_down,
 };
@@ -1199,13 +1162,12 @@ const HealthState = enum {
 
 Rules:
 
-- `recovering`: startup replay/checkpoint load is in progress; public writes/checks are unavailable.
+- `recovering`: startup WAL replay is in progress; public writes/checks are unavailable.
 - `healthy`: reads and writes are available.
 - `read_only_storage_error`: checks may continue at the last published revision, but writes are rejected.
-- `degraded_checkpoint`: writes and checks may continue, but checkpoint creation or verification is failing.
 - `fatal_corruption`: public reads and writes are unavailable until operator repair or restore.
 - `shutting_down`: no new commands are admitted.
-- `health` returns current revision, schema version, storage state, last checkpoint revision, WAL segment, and last fatal/degraded error if present.
+- `health` returns current revision, schema version, storage state, WAL segment, and last fatal error if present.
 
 ---
 
@@ -1241,7 +1203,6 @@ TUPLE_NOT_FOUND
 DUPLICATE_TUPLE_IN_BATCH
 EMPTY_BATCH
 PRECONDITION_FAILED
-REQUEST_ID_CONFLICT
 TENANT_MISMATCH
 REVISION_NOT_AVAILABLE
 CHECK_DEPTH_EXCEEDED
@@ -1252,7 +1213,6 @@ WRITE_QUEUE_FULL
 WAL_APPEND_FAILED
 WAL_FSYNC_FAILED
 WAL_CORRUPT
-CHECKPOINT_CORRUPT
 AUTHZ_STATE_UNAVAILABLE
 LIMIT_EXCEEDED
 ```
@@ -1271,7 +1231,6 @@ Potential admin/debug commands:
 - `dump_tuple`
 - `inspect_indexes`
 - `verify_wal`
-- `verify_checkpoint`
 - `dump_schema_registry`
 - `dump_dictionaries`
 - `storage_health`
@@ -1332,10 +1291,6 @@ Rejected in MVP 1.
 ### Stable dictionaries
 
 Dictionary ID allocation is deterministic, logged, and never reused.
-
-### Idempotent retry
-
-For a retained `(tenant_id, command_type, request_id)`, identical retry returns the original result and conflicting retry is rejected.
 
 ### Deterministic replay
 
@@ -1486,14 +1441,6 @@ DELETE document:doc1#viewer@user:kien => rev 11
 CHECK at_least 11 => false
 ```
 
-### Idempotent Retry
-
-```text
-WRITE request_id=req1 document:doc1#viewer@user:kien => rev 10
-WRITE request_id=req1 document:doc1#viewer@user:kien => rev 10
-WRITE request_id=req1 document:doc2#viewer@user:kien => REQUEST_ID_CONFLICT
-```
-
 ### Schema Compatibility
 
 ```text
@@ -1532,18 +1479,17 @@ restart
 engine recovers up to last valid revision
 ```
 
-### Canonical Idempotency
+### Canonical Command Encoding
 
 ```text
-WRITE request_id=req1 [tuple_b, tuple_a] => rev 20
-WRITE request_id=req1 [tuple_a, tuple_b] => rev 20
+WRITE [tuple_b, tuple_a] => canonical payload hash H
+WRITE [tuple_a, tuple_b] => canonical payload hash H
 ```
 
 Expected:
 
 ```text
 same canonical payload hash
-same original revision returned
 ```
 
 ### Public Check Rejects Relation
@@ -1601,7 +1547,6 @@ Required categories:
 - parser and schema compiler tests
 - schema compatibility tests
 - canonical command hashing tests
-- idempotent retry and request ID conflict tests
 - tuple/index consistency tests after every write/delete
 - direct, group, nested group, parent inheritance, and tenant admin checks
 - public check rejects relations
@@ -1610,7 +1555,6 @@ Required categories:
 - explain-one successful proof tests
 - denied and failed-closed explain tests
 - deterministic WAL replay tests
-- checkpoint plus WAL replay tests
 - partial-tail recovery tests
 - middle-corruption fatal tests
 - crash-after-each-write-step tests using fault injection
@@ -1647,7 +1591,6 @@ Metrics:
 - memory usage
 - WAL bytes per write
 - recovery time
-- checkpoint duration
 - nodes visited
 - edges scanned
 - index lookups
@@ -1683,7 +1626,6 @@ src/
   storage/
     wal.zig
     wal_codec.zig
-    checkpoint.zig
     checksum.zig
     recovery.zig
     layout.zig
@@ -1738,10 +1680,9 @@ src/
 6. Batch check
 7. WAL
 8. Recovery
-9. Checkpoints
-10. API/QL
-11. Stats
-12. Acceptance tests
+9. API/QL
+10. Stats
+11. Acceptance tests
 
 ---
 

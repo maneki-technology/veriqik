@@ -59,7 +59,6 @@ In MVP 1:
 
 - Single-node engine
 - Durable WAL
-- Periodic checkpoints
 - Relationship tuple writes/deletes
 - Schema DSL
 - Compiled permission programs
@@ -76,7 +75,6 @@ In MVP 1:
 - Basic performance stats
 - Tenant-scoped data model
 - Deterministic replay with stable dictionaries
-- Idempotent write retries via request IDs
 - Canonical command encoding
 - Single-writer/many-reader snapshot consistency
 - Explicit health states
@@ -87,6 +85,8 @@ In MVP 1:
 - Consensus
 - Distributed revisions
 - Multi-region deployment
+- Periodic checkpoints
+- Idempotent write retries via request IDs
 - Full materialized permissions
 - Group closure indexes
 - Wildcards
@@ -104,32 +104,34 @@ In MVP 1:
 
 ```mermaid
 flowchart TD
-    API[API / CLI / QL] --> Command[Typed Command IR]
-    Command --> Engine[Single-Node State Machine]
+    Client[Embedded Tests / CLI / Future Network API] --> API[Public API Boundary]
+    API --> Command[Typed Command IR]
+    Command --> Engine[Single-Node Authorization State Machine]
 
     Engine --> WAL[Append-Only WAL]
     Engine --> Revision[Revision Manager]
     Engine --> Schema[Compiled Schema Registry]
+    Engine --> Dictionary[Stable Dictionaries]
     Engine --> Exists[Exists Index]
     Engine --> Forward[Forward Index]
     Engine --> Reverse[Reverse Index]
-    Engine --> Dictionary[Stable Dictionaries]
-    Engine --> Dedupe[Request Dedupe]
 
-    WAL --> Recovery[Recovery]
+    WAL --> Recovery[Recovery / Full WAL Replay]
+    Recovery --> Revision
+    Recovery --> Schema
+    Recovery --> Dictionary
     Recovery --> Exists
     Recovery --> Forward
     Recovery --> Reverse
-    Recovery --> Schema
-    Recovery --> Dictionary
-    Recovery --> Dedupe
 
-    Schema --> Check[Check Engine]
+    Schema --> Check[Check / Batch Check Engine]
+    Dictionary --> Check
+    Revision --> Check
     Exists --> Check
     Forward --> Check
     Reverse --> Check
 
-    Check --> Explain[Explain-One]
+    Check --> Explain[Explain-One / Stats]
 ```
 
 ---
@@ -276,7 +278,6 @@ One human-readable proof path for successful checks.
 - Canonical command payloads
 - Logged dictionary allocations
 - Logged schema versions
-- Logged idempotency metadata
 - Replay on startup
 - Truncated-tail recovery
 
@@ -286,23 +287,7 @@ Writes survive restart.
 
 ---
 
-## 12. Milestone 8 – Checkpoints
-
-### Build
-
-- Snapshot file format
-- Atomic checkpoint write
-- Checkpoint checksum
-- Load newest valid checkpoint
-- Replay WAL after checkpoint
-
-### Deliverable
-
-Fast restart without replaying full WAL.
-
----
-
-## 13. Milestone 9 – API and CLI/QL
+## 12. Milestone 8 – API and CLI/QL
 
 ### Build
 
@@ -337,7 +322,7 @@ Usable local Veriqik engine via embedded API and CLI, with a network transport a
 
 ---
 
-## 14. Milestone 10 – Stats and Test Harness
+## 13. Milestone 9 – Stats and Test Harness
 
 ### Build
 
@@ -388,13 +373,11 @@ MVP 1 is complete when:
 - Revocation works with revision consistency
 - Cycles terminate safely
 - WAL recovery works
-- Checkpoint recovery works
 - Explain-one produces a valid proof
 - Batch check shares memoized subproblems
 - Invalid tuples are rejected by schema validation
 - Public checks reject relation targets
 - Failed-closed results are distinguishable from denial
-- Idempotent retry returns the original revision
 - Canonical command hashing is deterministic
 - Checks and batch checks observe stable evaluated revisions
 
@@ -408,8 +391,7 @@ MVP 1 is complete when:
 - Writes target relations
 - Checks target permissions
 - Schema and dictionary changes are logged state-machine changes
-- Retried writes with the same request ID are idempotent
-- Canonical command encoding defines idempotency identity
+- Canonical command encoding is deterministic
 - A committed batch is atomic
 - Revisions are monotonic
 - Traversal is bounded

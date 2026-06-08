@@ -465,7 +465,7 @@ Rules:
 
 ### Canonical Command
 
-The deterministic representation of a write command used for idempotency and WAL encoding.
+The deterministic representation of a write command used for WAL encoding and, later, request idempotency.
 
 Rules:
 
@@ -473,11 +473,13 @@ Rules:
 - Tuple keys and preconditions are sorted.
 - Duplicate tuple keys are rejected.
 - Schema text is normalized through parse/re-emit before hashing.
-- The request ID is excluded from the idempotency payload hash.
+- Future request-id idempotency uses the canonical command payload to detect identical retries and conflicts.
 
 ### Request ID
 
 A client-supplied idempotency key for safe write retries.
+
+Request IDs are deferred from MVP 1.
 
 Rules:
 
@@ -546,13 +548,15 @@ Rules:
 
 A durable snapshot of derived and committed state at one checkpoint revision.
 
+Checkpoints are deferred from MVP 1.
+
 Contains:
 
 - current revision
 - schema registry
 - dictionaries
 - indexes
-- idempotency table
+- future idempotency table
 
 ### Index
 
@@ -568,7 +572,8 @@ Rules:
 
 - Indexes are not the source of truth.
 - Indexes must remain consistent after writes/deletes.
-- Indexes must be rebuildable from WAL/checkpoint state.
+- Indexes must be rebuildable from WAL state.
+- Future checkpoints may shorten recovery but must not become the source of truth.
 
 ### Health State
 
@@ -579,7 +584,6 @@ MVP health states:
 - `recovering`
 - `healthy`
 - `read_only_storage_error`
-- `degraded_checkpoint`
 - `fatal_corruption`
 - `shutting_down`
 

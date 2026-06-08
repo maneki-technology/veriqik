@@ -127,10 +127,8 @@ Build a correct, durable, single-node authorization database.
 
 - Single-node state machine
 - WAL
-- Checkpoints
 - Relationship tuples
 - Stable dictionaries
-- Idempotent write retries
 - Native schema DSL
 - Explicit `relation`
 - Explicit `permission`
@@ -217,7 +215,9 @@ Make the engine safe to run.
 - Slow-check logging
 - Health endpoints
 - WAL verifier
+- Checkpoints
 - Checkpoint verifier
+- Idempotent write retries
 - Backup/restore
 - Storage scrubber
 - Admin CLI

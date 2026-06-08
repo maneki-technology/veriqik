@@ -59,7 +59,7 @@ Contains:
 - tuples
 - indexes
 - current revision
-- idempotency table
+- future idempotency table
 
 Consistency rules:
 
@@ -101,7 +101,7 @@ WAL
 Contains:
 
 - ordered WAL records
-- checkpoint boundary
+- future checkpoint boundary
 - segment metadata
 
 Consistency rules:
@@ -109,7 +109,7 @@ Consistency rules:
 - revisions are contiguous
 - checksums verify
 - record order is deterministic
-- checkpoint revision is a prefix of applied WAL state
+- future checkpoint revision is a prefix of applied WAL state
 
 ### Replicated Shard
 

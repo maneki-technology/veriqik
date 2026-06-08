@@ -18,7 +18,7 @@ This directory contains the product, domain, and technical design docs for Veriq
 4. [MVP 1 Plan](plans/MVP1.md)
    Describes the first implementation goal, scope, milestones, success demo, and acceptance criteria.
 
-5. [MVP 1 Technical Specification](specs/MVP1_Technical_Spec.md)
+5. [MVP 1 Technical Specification](specs/mvp1/Technical_Spec.md)
    Defines the current detailed implementation contract for the single-node MVP.
 
 6. [MVP 1 Spec Map](specs/mvp1/README.md)

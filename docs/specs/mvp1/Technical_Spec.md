@@ -2,7 +2,7 @@
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
-**Domain language:** [Veriqik Domain Language](../domain/Domain_Language.md)
+**Domain language:** [Veriqik Domain Language](../../domain/Domain_Language.md)
 
 **Normative language:** `MUST` means required for correctness or compatibility. `SHOULD` means expected unless there is a documented reason not to. `MAY` means optional behavior.
 
@@ -72,7 +72,7 @@ Permissions are execution entry points and planning/indexing units.
 
 ## 3. MVP 1 Scope
 
-The [MVP 1 Plan](../plans/MVP1.md) owns product scope and milestone order. This section summarizes the technical surface constrained by this specification.
+The [MVP 1 Plan](../../plans/MVP1.md) owns product scope and milestone order. This section summarizes the technical surface constrained by this specification.
 
 ### In Scope
 

@@ -2,6 +2,8 @@
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
+**Product thesis:** [Veriqik Product Thesis](../Product_Thesis.md)
+
 **Domain language:** [Veriqik Domain Language](../domain/Domain_Language.md)
 
 ## 1. Product Vision
@@ -49,15 +51,13 @@ The schema language is Veriqik-native from day one and Zed-inspired, but Veriqik
 
 ## 3. Product Differentiator
 
-Veriqik's main differentiator is its database design.
+Veriqik's main differentiator is its database design. See the [Product Thesis](../Product_Thesis.md) for the full competitive frame and proof points.
 
-The product bet is that authorization logic, relationship storage, indexing, revisions, recovery, and check execution belong inside one purpose-built authorization database.
-
-Database-design differentiators:
+In roadmap terms, this means Veriqik prioritizes:
 
 - narrow command surface
 - deterministic state-machine execution
-- WAL/checkpoints as database-owned recovery primitives
+- WAL and future checkpoints as database-owned recovery primitives
 - derived authorization indexes rebuilt from durable state
 - explicit batching and bounded work
 - no internal FGA-to-DB network hop during check/eval

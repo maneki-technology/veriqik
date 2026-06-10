@@ -636,7 +636,7 @@ Turn Veriqik into a complete authorization platform.
 
 ```mermaid
 flowchart TD
-    Core[Core FGA DB] --> AdminAPI[Admin API]
+    Core[Core Veriqik DB] --> AdminAPI[Admin API]
 
     AdminAPI --> UI[Web Console]
     AdminAPI --> CLI[CLI]

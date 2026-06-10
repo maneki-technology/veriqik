@@ -6,9 +6,9 @@ Date: 2026-06-07
 
 ## Decision
 
-Veriqik will not include caveats or conditional permissions in MVP1.
+Veriqik will not include caveats or conditional permissions in MVP 1.
 
-MVP1 permission evaluation is based on schema-defined ReBAC relationships and compiled permission expressions only. Request context, environmental attributes, tuple conditions, and time-based predicates are deferred.
+MVP 1 permission evaluation is based on schema-defined ReBAC relationships and compiled permission expressions only. Request context, environmental attributes, tuple conditions, and time-based predicates are deferred.
 
 ## Context
 
@@ -27,18 +27,18 @@ SpiceDB supports caveats, so this is part of the mature design space. Veriqik sh
 
 ## Considered Options
 
-- Include caveats in MVP1.
-- Include only time-based conditions in MVP1.
+- Include caveats in MVP 1.
+- Include only time-based conditions in MVP 1.
 - Defer caveats and conditional permissions.
 - Exclude caveats permanently.
 
 ## Rationale
 
-MVP1 should prove the core Veriqik loop first: schema compile, relationship writes, WAL, indexes, revisioned checks, explain paths, and recovery.
+MVP 1 should prove the core Veriqik loop first: schema compile, relationship writes, WAL, indexes, revisioned checks, explain paths, and recovery.
 
 Caveats introduce a second evaluation language and a second source of authorization truth. Adding them too early would make correctness, caching, explanations, and benchmarks harder to interpret.
 
-Deferring caveats keeps MVP1 simpler while preserving the future direction:
+Deferring caveats keeps MVP 1 simpler while preserving the future direction:
 
 - schema syntax can reserve caveat-related keywords
 - tuple storage can leave room for optional condition metadata
@@ -48,9 +48,9 @@ Deferring caveats keeps MVP1 simpler while preserving the future direction:
 
 ## Consequences
 
-- MVP1 cannot model contextual ABAC rules directly.
+- MVP 1 cannot model contextual ABAC rules directly.
 - Applications needing contextual checks must keep those checks outside Veriqik for now.
-- The MVP1 benchmark surface is cleaner because checks depend only on stored relationships and schema programs.
+- The MVP 1 benchmark surface is cleaner because checks depend only on stored relationships and schema programs.
 - Future caveat support will require explicit updates to the DSL, tuple format, check API, evaluator, explanation model, and cache keys.
 
 ## Confidence

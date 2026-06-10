@@ -8,7 +8,7 @@ Date: 2026-06-07
 
 Veriqik will define its own compact ReBAC DSL, inspired by SpiceDB's Zed schema language rather than OpenFGA's model format.
 
-Veriqik will not target full SpiceDB DSL compatibility in MVP1. The DSL should preserve familiar relation/permission semantics where they help, while remaining free to choose Veriqik-specific syntax, constraints, AST shape, error behavior, and execution semantics.
+Veriqik will not target full SpiceDB DSL compatibility in MVP 1. The DSL should preserve familiar relation/permission semantics where they help, while remaining free to choose Veriqik-specific syntax, constraints, AST shape, error behavior, and execution semantics.
 
 ## Context
 
@@ -29,7 +29,7 @@ Veriqik's DSL must serve the database engine, not only the user-facing schema su
 
 Zed is the best existing reference because it is concise, relation/permission aware, and proven in real ReBAC systems.
 
-Full compatibility is not the right MVP1 goal. It would force Veriqik to inherit every SpiceDB semantic edge case before the storage engine, planner, and evaluator have proven their own shape.
+Full compatibility is not the right MVP 1 goal. It would force Veriqik to inherit every SpiceDB semantic edge case before the storage engine, planner, and evaluator have proven their own shape.
 
 The proposed direction is to reuse the mature ideas, not the compatibility contract:
 
@@ -45,13 +45,13 @@ The proposed direction is to reuse the mature ideas, not the compatibility contr
 - Users familiar with SpiceDB should find the core concepts recognizable.
 - Veriqik avoids promising SpiceDB compatibility before the engine exists.
 - Some migration/import use cases will require explicit translation instead of direct reuse.
-- The DSL spec must clearly mark which Zed-inspired features are in MVP1 and which are deferred.
+- The DSL spec must clearly mark which Zed-inspired features are in MVP 1 and which are deferred.
 
 ## Confidence
 
 Medium.
 
-Reevaluate if MVP1 users strongly need direct SpiceDB schema compatibility, or if the Veriqik engine design diverges enough that Zed-inspired syntax becomes misleading.
+Reevaluate if MVP 1 users strongly need direct SpiceDB schema compatibility, or if the Veriqik engine design diverges enough that Zed-inspired syntax becomes misleading.
 
 ## Supersedes
 

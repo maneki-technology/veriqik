@@ -29,7 +29,7 @@ permission = compiled authorization program
 
 This is intentionally different from models that treat computed access as just another rewritten relation.
 
-The DSL is Veriqik-native from day one. It is Zanzibar-inspired at the ReBAC model level, but it does not aim for Zanzibar/OpenFGA schema compatibility.
+The DSL is Veriqik-native from day one and Zed-inspired, but it does not aim for SpiceDB/Zed, Zanzibar, or OpenFGA schema compatibility.
 
 Example:
 
@@ -351,7 +351,7 @@ Early performance visibility.
 
 ---
 
-## 15. MVP 1 Success Demo
+## 14. MVP 1 Success Demo
 
 The MVP should support this end-to-end flow:
 
@@ -370,7 +370,7 @@ The MVP should support this end-to-end flow:
 
 ---
 
-## 16. MVP 1 Acceptance Criteria
+## 15. MVP 1 Acceptance Criteria
 
 MVP 1 is complete when:
 
@@ -392,7 +392,7 @@ MVP 1 is complete when:
 
 ---
 
-## 17. MVP 1 Non-Negotiable Invariants
+## 16. MVP 1 Non-Negotiable Invariants
 
 - WAL is the source of truth
 - Indexes are derived and rebuildable

@@ -4,7 +4,7 @@
 
 This document defines Veriqik's ubiquitous language. Product docs, technical specs, code, tests, APIs, CLI commands, and user-facing explanations should use these terms consistently.
 
-Veriqik is a domain-specific database for Fine-Grained Authorization (FGA) using Relationship-Based Access Control (ReBAC). It is Zanzibar-inspired at the model level and TigerBeetle-inspired at the database level, but it uses its own domain language and DSL.
+Veriqik is a domain-specific database for Fine-Grained Authorization (FGA) using Relationship-Based Access Control (ReBAC). It borrows database design discipline from TigerBeetle and uses a Veriqik-native, Zed-inspired DSL.
 
 For DDD entities, value objects, aggregates, and domain services, see [Domain_Model.md](Domain_Model.md).
 
@@ -756,7 +756,7 @@ A guarantee that a client can observe newly granted access by requiring at least
 
 ### Read-After-Revoke
 
-A safety-sensitive form of read-after-write where the write removed access.
+A safety-sensitive form of read-after-write where the write revoked access.
 
 Rule:
 

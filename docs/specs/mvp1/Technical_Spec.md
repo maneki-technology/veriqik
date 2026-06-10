@@ -303,7 +303,7 @@ MVP 1 rules:
 
 ## 8. Schema DSL
 
-Veriqik uses its own DSL from day one. It is inspired by Zanzibar-style ReBAC, but it is not Zanzibar/OpenFGA-compatible syntax.
+Veriqik uses its own DSL from day one. It is Zed-inspired, but it is not SpiceDB/Zed, Zanzibar, or OpenFGA-compatible syntax.
 
 The DSL intentionally distinguishes:
 

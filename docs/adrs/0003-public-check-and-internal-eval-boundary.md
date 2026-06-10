@@ -1,4 +1,4 @@
-# 0004 Public Check and Internal Eval Boundary
+# 0003 Public Check and Internal Eval Boundary
 
 Status: Proposed
 

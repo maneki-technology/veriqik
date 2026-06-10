@@ -1,4 +1,4 @@
-# 0006 Consistency Over Availability for Fresh Authorization
+# 0005 Consistency Over Availability for Fresh Authorization
 
 Status: Proposed
 

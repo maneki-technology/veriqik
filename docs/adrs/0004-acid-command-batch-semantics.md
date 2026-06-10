@@ -1,4 +1,4 @@
-# 0005 ACID Command-Batch Semantics
+# 0004 ACID Command-Batch Semantics
 
 Status: Proposed
 

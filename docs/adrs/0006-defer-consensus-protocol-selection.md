@@ -1,4 +1,4 @@
-# 0007 Defer Consensus Protocol Selection
+# 0006 Defer Consensus Protocol Selection
 
 Status: Proposed
 

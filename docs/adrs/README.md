@@ -21,13 +21,12 @@ ADR 0001 records the ADR process. The remaining proposed ADRs are ordered by arc
 | ADR | Status | Title |
 |---|---|---|
 | [0001](0001-record-architecture-decisions-in-repo.md) | Proposed | Record Architecture Decisions in Repo |
-| [0002](0002-build-domain-specific-authorization-database.md) | Proposed | Build a Domain-Specific Authorization Database |
-| [0003](0003-use-zed-inspired-veriqik-dsl.md) | Proposed | Use a Zed-Inspired Veriqik DSL |
-| [0004](0004-public-check-and-internal-eval-boundary.md) | Proposed | Public Check and Internal Eval Boundary |
-| [0005](0005-acid-command-batch-semantics.md) | Proposed | ACID Command-Batch Semantics |
-| [0006](0006-consistency-over-availability-for-fresh-authorization.md) | Proposed | Consistency Over Availability for Fresh Authorization |
-| [0007](0007-defer-consensus-protocol-selection.md) | Proposed | Defer Consensus Protocol Selection |
-| [0008](0008-defer-caveats-and-conditional-permissions.md) | Proposed | Defer Caveats and Conditional Permissions |
+| [0002](0002-use-zed-inspired-veriqik-dsl.md) | Proposed | Use a Zed-Inspired Veriqik DSL |
+| [0003](0003-public-check-and-internal-eval-boundary.md) | Proposed | Public Check and Internal Eval Boundary |
+| [0004](0004-acid-command-batch-semantics.md) | Proposed | ACID Command-Batch Semantics |
+| [0005](0005-consistency-over-availability-for-fresh-authorization.md) | Proposed | Consistency Over Availability for Fresh Authorization |
+| [0006](0006-defer-consensus-protocol-selection.md) | Proposed | Defer Consensus Protocol Selection |
+| [0007](0007-defer-caveats-and-conditional-permissions.md) | Proposed | Defer Caveats and Conditional Permissions |
 
 ## Template
 

@@ -1,4 +1,4 @@
-# 0008 Defer Caveats and Conditional Permissions
+# 0007 Defer Caveats and Conditional Permissions
 
 Status: Proposed
 

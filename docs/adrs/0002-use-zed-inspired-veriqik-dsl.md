@@ -1,4 +1,4 @@
-# 0003 Use a Zed-Inspired Veriqik DSL
+# 0002 Use a Zed-Inspired Veriqik DSL
 
 Status: Proposed
 

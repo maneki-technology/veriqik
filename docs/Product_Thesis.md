@@ -6,6 +6,8 @@ Veriqik is a domain-specific database for Fine-Grained Authorization (FGA) and R
 
 The thesis is simple: authorization logic, relationship storage, indexes, revisions, recovery, and check execution should be designed together as one database system.
 
+For draft hypotheses about the first customer, first winning workload, adoption path, and product failure modes, see [Product_Wedge.md](Product_Wedge.md).
+
 ## 1. The Product Bet
 
 Existing FGA systems prove that relationship-based authorization is useful and important. Veriqik accepts that direction and competes by making a stronger database claim.
@@ -13,6 +15,8 @@ Existing FGA systems prove that relationship-based authorization is useful and i
 Fine-grained authorization should not be treated as only a service layer over a general datastore abstraction. The database itself should understand authorization semantics.
 
 Fine-grained authorization is common enough, latency-sensitive enough, and correctness-sensitive enough to justify a database built specifically for it. Modern applications repeatedly need the same authorization shape: subjects, objects, relationships, permissions, revocation freshness, auditability, and explainability. Veriqik treats that as a database workload, not incidental application logic.
+
+This matters most when authorization sits on critical product paths, such as regulated action authorization, where every sensitive operation may require fresh permission checks.
 
 This is the same kind of product bet TigerBeetle makes for online transaction processing: when a domain is common, safety-critical, and performance-sensitive, a narrow database with domain-native primitives can be better than forcing the workload through a general-purpose database model.
 

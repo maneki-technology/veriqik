@@ -4,6 +4,8 @@
 
 **Product thesis:** [Veriqik Product Thesis](../Product_Thesis.md)
 
+**Product wedge template:** [Veriqik Product Wedge Template](../Product_Wedge.md)
+
 **Domain language:** [Veriqik Domain Language](../domain/Domain_Language.md)
 
 ## 1. Product Vision

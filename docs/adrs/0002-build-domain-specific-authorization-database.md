@@ -39,7 +39,9 @@ OpenFGA and SpiceDB are strong choices when the goal is to adopt an existing FGA
 
 The core Veriqik idea is that authorization logic, relationship storage, indexing, consistency, and explainability belong together in one purpose-built database.
 
-Using OpenFGA, SpiceDB, or a general-purpose database would reduce early implementation cost, but it would also constrain Veriqik to another system's model or push the hardest authorization behavior into application code.
+Veriqik is intended to compete with existing FGA systems and general-purpose datastore approaches by making a stronger architectural claim: fine-grained authorization should be executed by a database designed around authorization semantics, not by a service layered over a general datastore abstraction.
+
+This is not only a build-vs-buy choice. It is the product thesis. Veriqik should be better when native authorization state, native indexes, revision-aware checks, failed-closed behavior, and explainability are designed together from the storage boundary up.
 
 The main gaps Veriqik intends to close are:
 

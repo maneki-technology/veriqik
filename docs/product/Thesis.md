@@ -6,7 +6,7 @@ Veriqik is a domain-specific database for Fine-Grained Authorization (FGA) and R
 
 The thesis is simple: authorization logic, relationship storage, indexes, revisions, recovery, and check execution should be designed together as one database system.
 
-For draft hypotheses about the first customer, first winning workload, adoption path, and product failure modes, see [Product_Wedge.md](Product_Wedge.md).
+For draft hypotheses about the first customer, first winning workload, adoption path, and product failure modes, see [Wedge_Template.md](Wedge_Template.md).
 
 ## 1. The Product Bet
 

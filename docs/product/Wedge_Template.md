@@ -2,7 +2,7 @@
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
-This document is a working template for turning the product thesis into a narrower product strategy. The thesis explains why Veriqik should exist. This template captures hypotheses about where Veriqik could win first, who could care first, and what could make the product fail.
+This document is a working template for turning the product thesis into a narrower product strategy. The [product thesis](Thesis.md) explains why Veriqik should exist. This template captures hypotheses about where Veriqik could win first, who could care first, and what could make the product fail.
 
 Nothing in this document is final positioning. Treat each section as a prompt to refine, validate, replace, or delete.
 

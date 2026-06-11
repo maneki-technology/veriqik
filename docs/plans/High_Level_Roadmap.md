@@ -2,9 +2,9 @@
 
 **Tagline:** A purpose-built database for fine-grained authorization.
 
-**Product thesis:** [Veriqik Product Thesis](../Product_Thesis.md)
+**Product thesis:** [Veriqik Product Thesis](../product/Thesis.md)
 
-**Product wedge template:** [Veriqik Product Wedge Template](../Product_Wedge.md)
+**Product wedge template:** [Veriqik Product Wedge Template](../product/Wedge_Template.md)
 
 **Domain language:** [Veriqik Domain Language](../domain/Domain_Language.md)
 
@@ -53,7 +53,7 @@ The schema language is Veriqik-native from day one and Zed-inspired, but Veriqik
 
 ## 3. Product Differentiator
 
-Veriqik's main differentiator is its database design. See the [Product Thesis](../Product_Thesis.md) for the full competitive frame and proof points.
+Veriqik's main differentiator is its database design. See the [Product Thesis](../product/Thesis.md) for the full competitive frame and proof points.
 
 In roadmap terms, this means Veriqik prioritizes:
 

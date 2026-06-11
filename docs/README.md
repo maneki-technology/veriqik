@@ -6,36 +6,38 @@ This directory contains the product, domain, and technical design docs for Veriq
 
 ## Reading Order
 
-1. [Product Thesis](Product_Thesis.md)
+1. [Product Documentation](product/README.md)
+   Starts with the product thesis, then product wedge hypotheses and discovery backlog.
+
+2. [Product Thesis](product/Thesis.md)
    States the product bet and what Veriqik must prove.
 
-2. [Product Wedge Template](Product_Wedge.md)
+3. [Product Wedge Template](product/Wedge_Template.md)
    Captures draft hypotheses for the first customer, first winning workload, adoption path, proof points, and product failure modes.
 
-3. [Domain Language](domain/Domain_Language.md)
+4. [Domain Language](domain/Domain_Language.md)
    Defines the ubiquitous language for authorization, database, explainability, and distributed database concepts.
 
-4. [Architecture Decision Records](adrs/README.md)
+5. [Architecture Decision Records](adrs/README.md)
    Records proposed, accepted, and superseded architectural decisions.
 
-5. [High-Level Roadmap](plans/High_Level_Roadmap.md)
+6. [High-Level Roadmap](plans/High_Level_Roadmap.md)
    Describes the long-term product direction and phased roadmap.
 
-6. [MVP 1 Plan](plans/MVP1.md)
+7. [MVP 1 Plan](plans/MVP1.md)
    Describes the first implementation goal, scope, milestones, success demo, and acceptance criteria.
 
-7. [MVP 1 Technical Specification](specs/mvp1/Technical_Spec.md)
+8. [MVP 1 Technical Specification](specs/mvp1/Technical_Spec.md)
    Defines the current detailed implementation contract for the single-node MVP.
 
-8. [MVP 1 Spec Map](specs/mvp1/README.md)
+9. [MVP 1 Spec Map](specs/mvp1/README.md)
    Provides a focused map through the large MVP 1 technical spec and names the future split points.
 
 ## Document Roles
 
 | Area | Purpose |
 |---|---|
-| `Product_Thesis.md` | Product bet, competitive frame, differentiator, proof points |
-| `Product_Wedge.md` | Draft product wedge template: first customer, first pain, winning workload, adoption path, failure modes |
+| `product/` | Product thesis, wedge hypotheses, discovery backlog, benchmark wedge template |
 | `domain/` | Stable vocabulary, DDD model, naming rules, anti-corruption language |
 | `plans/` | Product direction, roadmap, milestones, scope, acceptance criteria |
 | `specs/` | Normative implementation behavior and testable contracts |

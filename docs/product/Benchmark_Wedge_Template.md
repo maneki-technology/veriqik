@@ -16,7 +16,48 @@ High-volume `check` and `batch_check` workloads over relationship graphs where r
 
 ## 2. Workload Shape
 
-To be filled after MVP 1 exists.
+Initial scale target:
+
+- 1,000 orgs
+- 10,000 teams
+- 100,000 groups
+- 1,000,000 users
+- 100,000,000 documents
+
+The current prototype exposes this with:
+
+```sh
+cd prototype
+zig build run -- load-plan
+```
+
+Current generated shape:
+
+- nested groups
+- org admin inheritance
+- org-scoped active membership
+- team membership
+- folder parent inheritance
+- document parent/team/org traversal
+- banned exclusions
+- multiple viewer edges per resource
+
+Current prototype stance:
+
+The benchmark should not model `active` as a per-document relation to users. At 100,000,000 documents and 1,000,000 users, that creates a document-by-user matrix and overwhelms the authorization graph with an unrealistic relation.
+
+The current load shape models activity at org scope:
+
+```text
+org:o1#active_member@user:u1
+permission view = allowed & org.active - banned
+```
+
+If activity/state constraints are needed later, they should be:
+
+- inherited from team/org/resource scope
+- modeled through future caveats/context
+- removed from the benchmark and replaced with another high-fanout constraint
 
 Capture:
 
@@ -82,4 +123,3 @@ Benchmark results should update:
 - [../plans/High_Level_Roadmap.md](../plans/High_Level_Roadmap.md)
 
 If Veriqik does not win the chosen workload, the next step should be to revise the product thesis, database design, or benchmark wedge before expanding the roadmap.
-

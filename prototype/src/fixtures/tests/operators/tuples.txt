@@ -1,0 +1,11 @@
+document:doc1#viewer@user:kien
+document:doc1#active@user:kien
+
+document:doc2#editor@user:linh
+document:doc2#active@user:linh
+
+document:doc3#viewer@user:mai
+
+document:doc4#viewer@user:anh
+document:doc4#active@user:anh
+document:doc4#banned@user:anh

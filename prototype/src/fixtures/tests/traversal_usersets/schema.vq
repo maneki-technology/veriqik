@@ -1,0 +1,41 @@
+type user
+
+type group {
+  relation member: user | group#member
+}
+
+type org {
+  relation active_member: user
+  permission active = active_member
+}
+
+type team {
+  relation org: org
+  relation member: group#member
+
+  permission active = org.active
+  permission view = member & active
+}
+
+type folder {
+  relation parent: folder
+  relation team: team
+  relation viewer: group#member
+
+  permission local_view = viewer
+  permission inherited_view = parent.view
+  permission team_view = team.view
+  permission view = local_view + inherited_view + team_view
+}
+
+type document {
+  relation parent: folder
+  relation team: team
+  relation org: org
+  relation viewer: group#member
+  relation banned: user
+
+  permission allowed = viewer + parent.view + team.view
+  permission active = org.active
+  permission view = allowed & active - banned
+}

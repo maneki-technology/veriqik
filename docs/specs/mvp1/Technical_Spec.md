@@ -1609,7 +1609,9 @@ Comparison runs should document dataset shape, batch size, consistency mode, net
 
 ---
 
-## 30. Zig Module Layout
+## 30. Future Zig Module Layout
+
+The exploratory prototype lives under `prototype/`. The following layout describes the intended production code organization, not the current prototype directory.
 
 ```text
 src/

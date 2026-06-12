@@ -18,6 +18,9 @@ Product docs are allowed to contain hypotheses. They should separate what is bel
 4. [Benchmark_Wedge_Template.md](Benchmark_Wedge_Template.md)
    Defines the benchmark workload template that should validate or weaken the product thesis.
 
+5. [Prototype_Lessons_Learned.md](Prototype_Lessons_Learned.md)
+   Records evidence and implementation lessons from the current prototype and generated load tests.
+
 ## Document Roles
 
 | Document | Purpose |
@@ -26,6 +29,7 @@ Product docs are allowed to contain hypotheses. They should separate what is bel
 | [Wedge_Template.md](Wedge_Template.md) | Draft wedge template and product hypotheses |
 | [Discovery_Backlog.md](Discovery_Backlog.md) | Product questions and validation backlog |
 | [Benchmark_Wedge_Template.md](Benchmark_Wedge_Template.md) | Benchmark workload hypothesis, baselines, metrics, and success thresholds |
+| [Prototype_Lessons_Learned.md](Prototype_Lessons_Learned.md) | Prototype evidence, implementation lessons, benchmark observations, and remaining risks |
 
 ## Writing Rules
 

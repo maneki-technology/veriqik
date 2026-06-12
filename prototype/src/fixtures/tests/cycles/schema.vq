@@ -1,0 +1,10 @@
+type user
+
+type group {
+  relation member: user | group#member
+}
+
+type document {
+  relation viewer: group#member
+  permission view = viewer
+}

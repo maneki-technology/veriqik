@@ -1,0 +1,28 @@
+type user
+
+type group {
+  relation member: user | group#member
+}
+
+type tenant {
+  relation admin_member: user | group#member
+  permission admin = admin_member
+}
+
+type folder {
+  relation tenant: tenant
+  relation viewer: user | group#member
+  relation editor: user | group#member
+
+  permission view = viewer + editor + tenant.admin
+  permission edit = editor + tenant.admin
+}
+
+type document {
+  relation parent: folder
+  relation viewer: user | group#member
+  relation editor: user | group#member
+
+  permission view = viewer + editor + parent.view
+  permission edit = editor + parent.edit
+}

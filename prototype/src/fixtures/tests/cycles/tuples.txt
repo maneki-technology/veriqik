@@ -1,0 +1,4 @@
+group:unused#member@user:kien
+group:a#member@group:b#member
+group:b#member@group:a#member
+document:cyclic#viewer@group:a#member

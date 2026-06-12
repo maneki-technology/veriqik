@@ -1,0 +1,12 @@
+type user
+
+type document {
+  relation viewer: user
+  relation editor: user
+  relation active: user
+  relation banned: user
+
+  permission can_see = viewer + editor
+  permission active_view = can_see & active
+  permission view = active_view - banned
+}

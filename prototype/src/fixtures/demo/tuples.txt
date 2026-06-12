@@ -1,0 +1,2 @@
+group:eng#member@user:kien
+document:doc1#viewer@group:eng#member

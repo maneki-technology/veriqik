@@ -1,0 +1,5 @@
+allowed user:kien document:doc1 view
+allowed user:linh document:doc1 view
+denied user:blocked document:doc2 view
+allowed user:kien document:doc3 view
+denied user:unknown document:doc1 view

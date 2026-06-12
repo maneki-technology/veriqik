@@ -1,0 +1,17 @@
+# The load command generates tuples from parameters.
+# This file documents the generated tuple shape:
+#
+# group:g0#member@user:u0
+# group:g1#member@group:g0#member
+# org:o0#admin_member@group:g0#member
+# org:o0#active_member@user:u0
+# team:t0#org@org:o0
+# team:t0#member@group:g1#member
+# folder:f1#parent@folder:f0
+# folder:f1#team@team:t0
+# folder:f1#viewer@group:g2#member
+# document:d0#parent@folder:f1
+# document:d0#team@team:t0
+# document:d0#org@org:o0
+# document:d0#viewer@group:g0#member
+# document:d0#banned@user:u0

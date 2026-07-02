@@ -4,7 +4,7 @@ const TokenType = token.TokenType;
 const std = @import("std");
 const testing = std.testing;
 
-const Lexer = struct {
+pub const Lexer = struct {
     input: []const u8,
     pos: usize,
     readPos: usize,
@@ -51,11 +51,8 @@ const Lexer = struct {
             '?' => {
                 t.type = TokenType.question;
             },
-            '=' => {
-                t.type = TokenType.assign;
-            },
-            '.' => {
-                t.type = TokenType.dot;
+            ':' => {
+                t.type = TokenType.colon;
             },
             '*' => {
                 t.type = TokenType.star;
@@ -96,7 +93,7 @@ const Lexer = struct {
                     .end = self.pos,
                 };
             },
-            '&', '|', '-', '?', '=', '.', '*', '#', '{', '}', '[', ']', '(', ')' => {
+            '&', '|', '-', '?', ':', '*', '#', '{', '}', '[', ']', '(', ')' => {
                 t = self.readSingleCharToken();
             },
             else => {
@@ -113,23 +110,22 @@ const Lexer = struct {
 };
 
 test "single character tokens" {
-    const input = "&|-?=.*#{}[]()";
+    const input = "&|-?:*#{}[]()";
     var lexer = Lexer.init(input);
     const expected = [_]Token{
         Token{ .type = TokenType.ampersand, .start = 0, .end = 1 },
         Token{ .type = TokenType.pipe, .start = 1, .end = 2 },
         Token{ .type = TokenType.minus, .start = 2, .end = 3 },
         Token{ .type = TokenType.question, .start = 3, .end = 4 },
-        Token{ .type = TokenType.assign, .start = 4, .end = 5 },
-        Token{ .type = TokenType.dot, .start = 5, .end = 6 },
-        Token{ .type = TokenType.star, .start = 6, .end = 7 },
-        Token{ .type = TokenType.hash, .start = 7, .end = 8 },
-        Token{ .type = TokenType.l_brace, .start = 8, .end = 9 },
-        Token{ .type = TokenType.r_brace, .start = 9, .end = 10 },
-        Token{ .type = TokenType.l_bracket, .start = 10, .end = 11 },
-        Token{ .type = TokenType.r_bracket, .start = 11, .end = 12 },
-        Token{ .type = TokenType.l_paren, .start = 12, .end = 13 },
-        Token{ .type = TokenType.r_paren, .start = 13, .end = 14 },
+        Token{ .type = TokenType.colon, .start = 4, .end = 5 },
+        Token{ .type = TokenType.star, .start = 5, .end = 6 },
+        Token{ .type = TokenType.hash, .start = 6, .end = 7 },
+        Token{ .type = TokenType.l_brace, .start = 7, .end = 8 },
+        Token{ .type = TokenType.r_brace, .start = 8, .end = 9 },
+        Token{ .type = TokenType.l_bracket, .start = 9, .end = 10 },
+        Token{ .type = TokenType.r_bracket, .start = 10, .end = 11 },
+        Token{ .type = TokenType.l_paren, .start = 11, .end = 12 },
+        Token{ .type = TokenType.r_paren, .start = 12, .end = 13 },
     };
     var i: usize = 0;
     while (i < expected.len) : (i += 1) {

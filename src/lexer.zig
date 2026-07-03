@@ -86,25 +86,108 @@ pub const Lexer = struct {
         return t;
     }
 
+    fn peekChar(self: *Lexer) u8 {
+        if (self.readPos >= self.input.len) {
+            return 0;
+        }
+        return self.input[self.readPos];
+    }
+
+    fn isWhitespace(self: *Lexer) bool {
+        return self.ch == ' ' or self.ch == '\t' or self.ch == '\n' or self.ch == '\r';
+    }
+
+    fn eatWhitespace(self: *Lexer) void {
+        while (self.isWhitespace()) {
+            self.readChar();
+        }
+    }
+
+    fn readLookaheadCharToken(self: *Lexer) Token {
+        var t = Token{
+            .type = TokenType.illegal,
+            .start = self.pos,
+            .end = self.readPos,
+        };
+        const nextCh = self.peekChar();
+        switch (self.ch) {
+            '=' => {
+                if (nextCh == '=') {
+                    t.type = TokenType.equal_equal;
+                    t.end = self.readPos + 1;
+                    self.readChar();
+                } else {
+                    t.type = TokenType.assign;
+                    return t;
+                }
+            },
+            '<' => {
+                if (nextCh == '=') {
+                    t.type = TokenType.less_equal;
+                    t.end = self.readPos + 1;
+                    self.readChar();
+                } else {
+                    t.type = TokenType.less;
+                    return t;
+                }
+            },
+            '>' => {
+                if (nextCh == '=') {
+                    t.type = TokenType.greater_equal;
+                    t.end = self.readPos + 1;
+                    self.readChar();
+                } else {
+                    t.type = TokenType.greater;
+                    return t;
+                }
+            },
+            '!' => {
+                if (nextCh == '=') {
+                    t.type = TokenType.bang_equal;
+                    t.end = self.readPos + 1;
+                    self.readChar();
+                } else {
+                    t.type = TokenType.bang;
+                    return t;
+                }
+            },
+            '.' => {
+                if (nextCh == '.') {
+                    t.type = TokenType.range;
+                    t.end = self.readPos + 1;
+                    self.readChar();
+                } else {
+                    t.type = TokenType.dot;
+                    return t;
+                }
+            },
+            else => {
+                t.type = TokenType.illegal;
+            },
+        }
+        return t;
+    }
+
     pub fn next(self: *Lexer) Token {
-        var t: Token = undefined;
+        self.eatWhitespace();
+        var t = Token{
+            .type = TokenType.illegal,
+            .start = self.pos,
+            .end = self.readPos,
+        };
         switch (self.ch) {
             0 => {
-                t = Token{
-                    .type = TokenType.eof,
-                    .start = self.pos,
-                    .end = self.pos,
-                };
+                t.type = TokenType.eof;
+                t.end = self.pos;
             },
             '&', '|', '-', '?', ':', ',', '*', '#', '{', '}', '[', ']', '(', ')' => {
                 t = self.readSingleCharToken();
             },
+            '=', '<', '>', '!', '.' => {
+                t = self.readLookaheadCharToken();
+            },
             else => {
-                t = Token{
-                    .type = TokenType.illegal,
-                    .start = self.pos,
-                    .end = self.readPos,
-                };
+                t.type = TokenType.illegal;
             },
         }
         self.readChar();
@@ -131,6 +214,54 @@ test "single character tokens" {
         Token{ .type = TokenType.l_paren, .start = 12, .end = 13 },
         Token{ .type = TokenType.r_paren, .start = 13, .end = 14 },
         Token{ .type = TokenType.eof, .start = 14, .end = 14 },
+    };
+    var i: usize = 0;
+    while (i < expected.len) : (i += 1) {
+        const t = lexer.next();
+        try testing.expectEqual(expected[i].type, t.type);
+        try testing.expectEqual(expected[i].start, t.start);
+        try testing.expectEqual(expected[i].end, t.end);
+    }
+}
+
+test "lookahead tokens" {
+    const input = "= < > == <= >= != .. .!";
+    var lexer = Lexer.init(input);
+    const expected = [_]Token{
+        Token{ .type = TokenType.assign, .start = 0, .end = 1 },
+        Token{ .type = TokenType.less, .start = 2, .end = 3 },
+        Token{ .type = TokenType.greater, .start = 4, .end = 5 },
+        Token{ .type = TokenType.equal_equal, .start = 6, .end = 8 },
+        Token{ .type = TokenType.less_equal, .start = 9, .end = 11 },
+        Token{ .type = TokenType.greater_equal, .start = 12, .end = 14 },
+        Token{ .type = TokenType.bang_equal, .start = 15, .end = 17 },
+        Token{ .type = TokenType.range, .start = 18, .end = 20 },
+        Token{ .type = TokenType.dot, .start = 21, .end = 22 },
+        Token{ .type = TokenType.bang, .start = 22, .end = 23 },
+        Token{ .type = TokenType.eof, .start = 23, .end = 23 },
+    };
+    var i: usize = 0;
+    while (i < expected.len) : (i += 1) {
+        const t = lexer.next();
+        try testing.expectEqual(expected[i].type, t.type);
+        try testing.expectEqual(expected[i].start, t.start);
+        try testing.expectEqual(expected[i].end, t.end);
+    }
+}
+
+test "lookahead tokens same first char consecutive" {
+    const input = "= == . .. == = .. .";
+    var lexer = Lexer.init(input);
+    const expected = [_]Token{
+        Token{ .type = TokenType.assign, .start = 0, .end = 1 },
+        Token{ .type = TokenType.equal_equal, .start = 2, .end = 4 },
+        Token{ .type = TokenType.dot, .start = 5, .end = 6 },
+        Token{ .type = TokenType.range, .start = 7, .end = 9 },
+        Token{ .type = TokenType.equal_equal, .start = 10, .end = 12 },
+        Token{ .type = TokenType.assign, .start = 13, .end = 14 },
+        Token{ .type = TokenType.range, .start = 15, .end = 17 },
+        Token{ .type = TokenType.dot, .start = 18, .end = 19 },
+        Token{ .type = TokenType.eof, .start = 19, .end = 19 },
     };
     var i: usize = 0;
     while (i < expected.len) : (i += 1) {

@@ -103,12 +103,6 @@ pub const Lexer = struct {
         return self.input[self.readPos];
     }
 
-    fn eatWhitespace(self: *Lexer) void {
-        while (std.ascii.isWhitespace(self.ch)) {
-            self.readChar();
-        }
-    }
-
     fn readLookaheadCharToken(self: *Lexer) Token {
         var t = Token{
             .type = TokenType.illegal,
@@ -180,10 +174,6 @@ pub const Lexer = struct {
         return std.ascii.isAlphanumeric(self.ch) or self.ch == '_';
     }
 
-    fn isDigit(self: *Lexer) bool {
-        return std.ascii.isDigit(self.ch);
-    }
-
     fn readIdentifierToken(self: *Lexer) Token {
         var t = Token{ .type = TokenType.identifier, .start = self.pos, .end = self.pos };
         while (self.isIdenContinue()) {
@@ -196,6 +186,10 @@ pub const Lexer = struct {
         return t;
     }
 
+    fn isDigit(self: *Lexer) bool {
+        return std.ascii.isDigit(self.ch);
+    }
+
     fn readNumberToken(self: *Lexer) Token {
         var t = Token{ .type = TokenType.integer, .start = self.pos, .end = self.pos };
         while (self.isDigit()) {
@@ -205,8 +199,43 @@ pub const Lexer = struct {
         return t;
     }
 
+    fn isCommentStart(self: *Lexer) bool {
+        const nextCh = self.peek();
+        return nextCh == '/' and self.ch == '/';
+    }
+
+    fn isCommentEnd(self: *Lexer) bool {
+        if (self.readPos >= self.input.len) {
+            return true;
+        }
+        return self.ch == '\n' or self.ch == '\r';
+    }
+
+    fn eatComment(self: *Lexer) void {
+        while (!self.isCommentEnd()) {
+            self.readChar();
+        }
+        self.readChar();
+    }
+
+    fn eatWhitespace(self: *Lexer) void {
+        while (std.ascii.isWhitespace(self.ch)) {
+            self.readChar();
+        }
+    }
+
+    fn eatTrivia(self: *Lexer) void {
+        while (true) {
+            self.eatWhitespace();
+            if (!self.isCommentStart()) {
+                return;
+            }
+            self.eatComment();
+        }
+    }
+
     pub fn next(self: *Lexer) Token {
-        self.eatWhitespace();
+        self.eatTrivia();
         var t = Token{
             .type = TokenType.illegal,
             .start = self.pos,
@@ -376,8 +405,26 @@ test "integers" {
     }
 }
 
-test "simple type with cardinality bounds" {
+test "comments" {
+    const input = "// this is a comment";
+    var lexer = Lexer.init(input);
+    const expected = [_]Token{
+        Token{ .type = TokenType.eof, .start = 20, .end = 20 },
+    };
+    var i: usize = 0;
+    while (i < expected.len) : (i += 1) {
+        const t = lexer.next();
+        try testing.expectEqual(expected[i].type, t.type);
+        try testing.expectEqual(expected[i].start, t.start);
+        try testing.expectEqual(expected[i].end, t.end);
+    }
+}
+
+test "simple type with cardinality bounds and comments" {
     const input =
+        \\//this is a comment
+        \\//this is another comment
+        \\//
         \\type Team {
         \\    relation member[0..10]: User
         \\    permission members = member
@@ -385,24 +432,24 @@ test "simple type with cardinality bounds" {
     ;
     var lexer = Lexer.init(input);
     const expected = [_]Token{
-        Token{ .type = TokenType.kw_type, .start = 0, .end = 4 },
-        Token{ .type = TokenType.identifier, .start = 5, .end = 9 },
-        Token{ .type = TokenType.l_brace, .start = 10, .end = 11 },
-        Token{ .type = TokenType.kw_relation, .start = 16, .end = 24 },
-        Token{ .type = TokenType.identifier, .start = 25, .end = 31 },
-        Token{ .type = TokenType.l_bracket, .start = 31, .end = 32 },
-        Token{ .type = TokenType.integer, .start = 32, .end = 33 },
-        Token{ .type = TokenType.range, .start = 33, .end = 35 },
-        Token{ .type = TokenType.integer, .start = 35, .end = 37 },
-        Token{ .type = TokenType.r_bracket, .start = 37, .end = 38 },
-        Token{ .type = TokenType.colon, .start = 38, .end = 39 },
-        Token{ .type = TokenType.identifier, .start = 40, .end = 44 },
-        Token{ .type = TokenType.kw_permission, .start = 49, .end = 59 },
-        Token{ .type = TokenType.identifier, .start = 60, .end = 67 },
-        Token{ .type = TokenType.assign, .start = 68, .end = 69 },
-        Token{ .type = TokenType.identifier, .start = 70, .end = 76 },
-        Token{ .type = TokenType.r_brace, .start = 77, .end = 78 },
-        Token{ .type = TokenType.eof, .start = 78, .end = 78 },
+        Token{ .type = TokenType.kw_type, .start = 49, .end = 53 },
+        Token{ .type = TokenType.identifier, .start = 54, .end = 58 },
+        Token{ .type = TokenType.l_brace, .start = 59, .end = 60 },
+        Token{ .type = TokenType.kw_relation, .start = 65, .end = 73 },
+        Token{ .type = TokenType.identifier, .start = 74, .end = 80 },
+        Token{ .type = TokenType.l_bracket, .start = 80, .end = 81 },
+        Token{ .type = TokenType.integer, .start = 81, .end = 82 },
+        Token{ .type = TokenType.range, .start = 82, .end = 84 },
+        Token{ .type = TokenType.integer, .start = 84, .end = 86 },
+        Token{ .type = TokenType.r_bracket, .start = 86, .end = 87 },
+        Token{ .type = TokenType.colon, .start = 87, .end = 88 },
+        Token{ .type = TokenType.identifier, .start = 89, .end = 93 },
+        Token{ .type = TokenType.kw_permission, .start = 98, .end = 108 },
+        Token{ .type = TokenType.identifier, .start = 109, .end = 116 },
+        Token{ .type = TokenType.assign, .start = 117, .end = 118 },
+        Token{ .type = TokenType.identifier, .start = 119, .end = 125 },
+        Token{ .type = TokenType.r_brace, .start = 126, .end = 127 },
+        Token{ .type = TokenType.eof, .start = 127, .end = 127 },
     };
     var i: usize = 0;
     while (i < expected.len) : (i += 1) {

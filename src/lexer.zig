@@ -20,16 +20,6 @@ pub const Lexer = struct {
     readPos: usize,
     ch: u8,
 
-    fn readChar(self: *Lexer) void {
-        self.pos = self.readPos;
-        if (self.readPos >= self.input.len) {
-            self.ch = 0;
-            return;
-        }
-        self.ch = self.input[self.readPos];
-        self.readPos += 1;
-    }
-
     pub fn init(input: []const u8) Lexer {
         var lexer = Lexer{
             .input = input,
@@ -40,6 +30,16 @@ pub const Lexer = struct {
 
         lexer.readChar();
         return lexer;
+    }
+
+    fn readChar(self: *Lexer) void {
+        self.pos = self.readPos;
+        if (self.readPos >= self.input.len) {
+            self.ch = 0;
+            return;
+        }
+        self.ch = self.input[self.readPos];
+        self.readPos += 1;
     }
 
     fn readSingleCharToken(self: *Lexer) Token {
@@ -268,156 +268,108 @@ pub const Lexer = struct {
     }
 };
 
+const ExpectedToken = struct {
+    type: TokenType,
+    lexeme: []const u8,
+};
+
+fn expectTokens(input: []const u8, expected: []const ExpectedToken) !void {
+    var lexer = Lexer.init(input);
+    for (expected) |want| {
+        const actual = lexer.next();
+        try testing.expectEqual(want.type, actual.type);
+        try testing.expectEqualStrings(want.lexeme, input[actual.start..actual.end]);
+        if (actual.type == .eof) {
+            try testing.expectEqual(input.len, actual.start);
+            try testing.expectEqual(input.len, actual.end);
+        }
+    }
+}
+
 test "single character tokens" {
     const input = "&|-?:,*#{}[]()";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.ampersand, .start = 0, .end = 1 },
-        Token{ .type = TokenType.pipe, .start = 1, .end = 2 },
-        Token{ .type = TokenType.minus, .start = 2, .end = 3 },
-        Token{ .type = TokenType.question, .start = 3, .end = 4 },
-        Token{ .type = TokenType.colon, .start = 4, .end = 5 },
-        Token{ .type = TokenType.comma, .start = 5, .end = 6 },
-        Token{ .type = TokenType.star, .start = 6, .end = 7 },
-        Token{ .type = TokenType.hash, .start = 7, .end = 8 },
-        Token{ .type = TokenType.l_brace, .start = 8, .end = 9 },
-        Token{ .type = TokenType.r_brace, .start = 9, .end = 10 },
-        Token{ .type = TokenType.l_bracket, .start = 10, .end = 11 },
-        Token{ .type = TokenType.r_bracket, .start = 11, .end = 12 },
-        Token{ .type = TokenType.l_paren, .start = 12, .end = 13 },
-        Token{ .type = TokenType.r_paren, .start = 13, .end = 14 },
-        Token{ .type = TokenType.eof, .start = 14, .end = 14 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .ampersand, .lexeme = "&" }, .{ .type = .pipe, .lexeme = "|" },
+        .{ .type = .minus, .lexeme = "-" },     .{ .type = .question, .lexeme = "?" },
+        .{ .type = .colon, .lexeme = ":" },     .{ .type = .comma, .lexeme = "," },
+        .{ .type = .star, .lexeme = "*" },      .{ .type = .hash, .lexeme = "#" },
+        .{ .type = .l_brace, .lexeme = "{" },   .{ .type = .r_brace, .lexeme = "}" },
+        .{ .type = .l_bracket, .lexeme = "[" }, .{ .type = .r_bracket, .lexeme = "]" },
+        .{ .type = .l_paren, .lexeme = "(" },   .{ .type = .r_paren, .lexeme = ")" },
+        .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "lookahead tokens" {
     const input = "= < > == <= >= != .. .!";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.assign, .start = 0, .end = 1 },
-        Token{ .type = TokenType.less, .start = 2, .end = 3 },
-        Token{ .type = TokenType.greater, .start = 4, .end = 5 },
-        Token{ .type = TokenType.equal_equal, .start = 6, .end = 8 },
-        Token{ .type = TokenType.less_equal, .start = 9, .end = 11 },
-        Token{ .type = TokenType.greater_equal, .start = 12, .end = 14 },
-        Token{ .type = TokenType.bang_equal, .start = 15, .end = 17 },
-        Token{ .type = TokenType.range, .start = 18, .end = 20 },
-        Token{ .type = TokenType.dot, .start = 21, .end = 22 },
-        Token{ .type = TokenType.bang, .start = 22, .end = 23 },
-        Token{ .type = TokenType.eof, .start = 23, .end = 23 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .assign, .lexeme = "=" },      .{ .type = .less, .lexeme = "<" },
+        .{ .type = .greater, .lexeme = ">" },     .{ .type = .equal_equal, .lexeme = "==" },
+        .{ .type = .less_equal, .lexeme = "<=" }, .{ .type = .greater_equal, .lexeme = ">=" },
+        .{ .type = .bang_equal, .lexeme = "!=" }, .{ .type = .range, .lexeme = ".." },
+        .{ .type = .dot, .lexeme = "." },         .{ .type = .bang, .lexeme = "!" },
+        .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "lookahead tokens same first char consecutive" {
     const input = "= == . .. == = .. .";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.assign, .start = 0, .end = 1 },
-        Token{ .type = TokenType.equal_equal, .start = 2, .end = 4 },
-        Token{ .type = TokenType.dot, .start = 5, .end = 6 },
-        Token{ .type = TokenType.range, .start = 7, .end = 9 },
-        Token{ .type = TokenType.equal_equal, .start = 10, .end = 12 },
-        Token{ .type = TokenType.assign, .start = 13, .end = 14 },
-        Token{ .type = TokenType.range, .start = 15, .end = 17 },
-        Token{ .type = TokenType.dot, .start = 18, .end = 19 },
-        Token{ .type = TokenType.eof, .start = 19, .end = 19 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .assign, .lexeme = "=" },       .{ .type = .equal_equal, .lexeme = "==" },
+        .{ .type = .dot, .lexeme = "." },          .{ .type = .range, .lexeme = ".." },
+        .{ .type = .equal_equal, .lexeme = "==" }, .{ .type = .assign, .lexeme = "=" },
+        .{ .type = .range, .lexeme = ".." },       .{ .type = .dot, .lexeme = "." },
+        .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "keywords" {
     const input = "type relation permission condition with in self";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.kw_type, .start = 0, .end = 4 },
-        Token{ .type = TokenType.kw_relation, .start = 5, .end = 13 },
-        Token{ .type = TokenType.kw_permission, .start = 14, .end = 24 },
-        Token{ .type = TokenType.kw_condition, .start = 25, .end = 34 },
-        Token{ .type = TokenType.kw_with, .start = 35, .end = 39 },
-        Token{ .type = TokenType.kw_in, .start = 40, .end = 42 },
-        Token{ .type = TokenType.kw_self, .start = 43, .end = 47 },
-        Token{ .type = TokenType.eof, .start = 47, .end = 47 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .kw_type, .lexeme = "type" },             .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .kw_permission, .lexeme = "permission" }, .{ .type = .kw_condition, .lexeme = "condition" },
+        .{ .type = .kw_with, .lexeme = "with" },             .{ .type = .kw_in, .lexeme = "in" },
+        .{ .type = .kw_self, .lexeme = "self" },             .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "identifiers" {
     const input = "foo bar baz foo_bar foo1";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.identifier, .start = 0, .end = 3 },
-        Token{ .type = TokenType.identifier, .start = 4, .end = 7 },
-        Token{ .type = TokenType.identifier, .start = 8, .end = 11 },
-        Token{ .type = TokenType.identifier, .start = 12, .end = 19 },
-        Token{ .type = TokenType.identifier, .start = 20, .end = 24 },
-        Token{ .type = TokenType.eof, .start = 24, .end = 24 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .identifier, .lexeme = "foo" },  .{ .type = .identifier, .lexeme = "bar" },
+        .{ .type = .identifier, .lexeme = "baz" },  .{ .type = .identifier, .lexeme = "foo_bar" },
+        .{ .type = .identifier, .lexeme = "foo1" }, .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "integers" {
     const input = "0 1 1234567890";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.integer, .start = 0, .end = 1 },
-        Token{ .type = TokenType.integer, .start = 2, .end = 3 },
-        Token{ .type = TokenType.integer, .start = 4, .end = 14 },
-        Token{ .type = TokenType.eof, .start = 14, .end = 14 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .integer, .lexeme = "0" },          .{ .type = .integer, .lexeme = "1" },
+        .{ .type = .integer, .lexeme = "1234567890" }, .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "comments" {
-    const input = "// this is a comment";
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.eof, .start = 20, .end = 20 },
+    const input = "// this is a comment\n// this is another comment\r// this is yet another comment\r\n";
+    const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
+    try expectTokens(input, &expected);
+}
+
+test "illegal characters" {
+    const input = "\\ / @ $ %";
+    const expected = [_]ExpectedToken{
+        .{ .type = .illegal, .lexeme = "\\" }, .{ .type = .illegal, .lexeme = "/" },
+        .{ .type = .illegal, .lexeme = "@" },  .{ .type = .illegal, .lexeme = "$" },
+        .{ .type = .illegal, .lexeme = "%" },  .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
 }
 
 test "simple type with cardinality bounds and comments" {
@@ -426,36 +378,149 @@ test "simple type with cardinality bounds and comments" {
         \\//this is another comment
         \\//
         \\type Team {
+        \\//this is a comment
         \\    relation member[0..10]: User
         \\    permission members = member
         \\}
+        \\//comment at the EOF
+        \\//another comment
+        \\//
     ;
-    var lexer = Lexer.init(input);
-    const expected = [_]Token{
-        Token{ .type = TokenType.kw_type, .start = 49, .end = 53 },
-        Token{ .type = TokenType.identifier, .start = 54, .end = 58 },
-        Token{ .type = TokenType.l_brace, .start = 59, .end = 60 },
-        Token{ .type = TokenType.kw_relation, .start = 65, .end = 73 },
-        Token{ .type = TokenType.identifier, .start = 74, .end = 80 },
-        Token{ .type = TokenType.l_bracket, .start = 80, .end = 81 },
-        Token{ .type = TokenType.integer, .start = 81, .end = 82 },
-        Token{ .type = TokenType.range, .start = 82, .end = 84 },
-        Token{ .type = TokenType.integer, .start = 84, .end = 86 },
-        Token{ .type = TokenType.r_bracket, .start = 86, .end = 87 },
-        Token{ .type = TokenType.colon, .start = 87, .end = 88 },
-        Token{ .type = TokenType.identifier, .start = 89, .end = 93 },
-        Token{ .type = TokenType.kw_permission, .start = 98, .end = 108 },
-        Token{ .type = TokenType.identifier, .start = 109, .end = 116 },
-        Token{ .type = TokenType.assign, .start = 117, .end = 118 },
-        Token{ .type = TokenType.identifier, .start = 119, .end = 125 },
-        Token{ .type = TokenType.r_brace, .start = 126, .end = 127 },
-        Token{ .type = TokenType.eof, .start = 127, .end = 127 },
+    const expected = [_]ExpectedToken{
+        .{ .type = .kw_type, .lexeme = "type" },             .{ .type = .identifier, .lexeme = "Team" },
+        .{ .type = .l_brace, .lexeme = "{" },                .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .identifier, .lexeme = "member" },        .{ .type = .l_bracket, .lexeme = "[" },
+        .{ .type = .integer, .lexeme = "0" },                .{ .type = .range, .lexeme = ".." },
+        .{ .type = .integer, .lexeme = "10" },               .{ .type = .r_bracket, .lexeme = "]" },
+        .{ .type = .colon, .lexeme = ":" },                  .{ .type = .identifier, .lexeme = "User" },
+        .{ .type = .kw_permission, .lexeme = "permission" }, .{ .type = .identifier, .lexeme = "members" },
+        .{ .type = .assign, .lexeme = "=" },                 .{ .type = .identifier, .lexeme = "member" },
+        .{ .type = .r_brace, .lexeme = "}" },                .{ .type = .eof, .lexeme = "" },
     };
-    var i: usize = 0;
-    while (i < expected.len) : (i += 1) {
-        const t = lexer.next();
-        try testing.expectEqual(expected[i].type, t.type);
-        try testing.expectEqual(expected[i].start, t.start);
-        try testing.expectEqual(expected[i].end, t.end);
-    }
+    try expectTokens(input, &expected);
+}
+
+test "full model" {
+    const input =
+        \\type User {}
+        \\
+        \\type Team {
+        \\  relation member[0..10]: User with expiration?
+        \\}
+        \\
+        \\condition allowed_ip(source_ip: IpAddress, networks: Network[]) {
+        \\  networks.any(network, network.contains(source_ip))
+        \\}
+        \\
+        \\type Project {
+        \\  relation organisation[1..1]: Organisation
+        \\  relation reader:
+        \\    User with u in organisation.members |
+        \\    Team#member with t in organisation.team
+        \\
+        \\  permission read = (reader | organisation.admins) - blocked
+        \\}
+    ;
+
+    const expected = [_]ExpectedToken{
+        .{ .type = .kw_type, .lexeme = "type" },
+        .{ .type = .identifier, .lexeme = "User" },
+        .{ .type = .l_brace, .lexeme = "{" },
+        .{ .type = .r_brace, .lexeme = "}" },
+
+        .{ .type = .kw_type, .lexeme = "type" },
+        .{ .type = .identifier, .lexeme = "Team" },
+        .{ .type = .l_brace, .lexeme = "{" },
+        .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .identifier, .lexeme = "member" },
+        .{ .type = .l_bracket, .lexeme = "[" },
+        .{ .type = .integer, .lexeme = "0" },
+        .{ .type = .range, .lexeme = ".." },
+        .{ .type = .integer, .lexeme = "10" },
+        .{ .type = .r_bracket, .lexeme = "]" },
+        .{ .type = .colon, .lexeme = ":" },
+        .{ .type = .identifier, .lexeme = "User" },
+        .{ .type = .kw_with, .lexeme = "with" },
+        .{ .type = .identifier, .lexeme = "expiration" },
+        .{ .type = .question, .lexeme = "?" },
+        .{ .type = .r_brace, .lexeme = "}" },
+
+        .{ .type = .kw_condition, .lexeme = "condition" },
+        .{ .type = .identifier, .lexeme = "allowed_ip" },
+        .{ .type = .l_paren, .lexeme = "(" },
+        .{ .type = .identifier, .lexeme = "source_ip" },
+        .{ .type = .colon, .lexeme = ":" },
+        .{ .type = .identifier, .lexeme = "IpAddress" },
+        .{ .type = .comma, .lexeme = "," },
+        .{ .type = .identifier, .lexeme = "networks" },
+        .{ .type = .colon, .lexeme = ":" },
+        .{ .type = .identifier, .lexeme = "Network" },
+        .{ .type = .l_bracket, .lexeme = "[" },
+        .{ .type = .r_bracket, .lexeme = "]" },
+        .{ .type = .r_paren, .lexeme = ")" },
+        .{ .type = .l_brace, .lexeme = "{" },
+        .{ .type = .identifier, .lexeme = "networks" },
+        .{ .type = .dot, .lexeme = "." },
+        .{ .type = .identifier, .lexeme = "any" },
+        .{ .type = .l_paren, .lexeme = "(" },
+        .{ .type = .identifier, .lexeme = "network" },
+        .{ .type = .comma, .lexeme = "," },
+        .{ .type = .identifier, .lexeme = "network" },
+        .{ .type = .dot, .lexeme = "." },
+        .{ .type = .identifier, .lexeme = "contains" },
+        .{ .type = .l_paren, .lexeme = "(" },
+        .{ .type = .identifier, .lexeme = "source_ip" },
+        .{ .type = .r_paren, .lexeme = ")" },
+        .{ .type = .r_paren, .lexeme = ")" },
+        .{ .type = .r_brace, .lexeme = "}" },
+
+        .{ .type = .kw_type, .lexeme = "type" },
+        .{ .type = .identifier, .lexeme = "Project" },
+        .{ .type = .l_brace, .lexeme = "{" },
+        .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .identifier, .lexeme = "organisation" },
+        .{ .type = .l_bracket, .lexeme = "[" },
+        .{ .type = .integer, .lexeme = "1" },
+        .{ .type = .range, .lexeme = ".." },
+        .{ .type = .integer, .lexeme = "1" },
+        .{ .type = .r_bracket, .lexeme = "]" },
+        .{ .type = .colon, .lexeme = ":" },
+        .{ .type = .identifier, .lexeme = "Organisation" },
+        .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .identifier, .lexeme = "reader" },
+        .{ .type = .colon, .lexeme = ":" },
+        .{ .type = .identifier, .lexeme = "User" },
+        .{ .type = .kw_with, .lexeme = "with" },
+        .{ .type = .identifier, .lexeme = "u" },
+        .{ .type = .kw_in, .lexeme = "in" },
+        .{ .type = .identifier, .lexeme = "organisation" },
+        .{ .type = .dot, .lexeme = "." },
+        .{ .type = .identifier, .lexeme = "members" },
+        .{ .type = .pipe, .lexeme = "|" },
+        .{ .type = .identifier, .lexeme = "Team" },
+        .{ .type = .hash, .lexeme = "#" },
+        .{ .type = .identifier, .lexeme = "member" },
+        .{ .type = .kw_with, .lexeme = "with" },
+        .{ .type = .identifier, .lexeme = "t" },
+        .{ .type = .kw_in, .lexeme = "in" },
+        .{ .type = .identifier, .lexeme = "organisation" },
+        .{ .type = .dot, .lexeme = "." },
+        .{ .type = .identifier, .lexeme = "team" },
+        .{ .type = .kw_permission, .lexeme = "permission" },
+        .{ .type = .identifier, .lexeme = "read" },
+        .{ .type = .assign, .lexeme = "=" },
+        .{ .type = .l_paren, .lexeme = "(" },
+        .{ .type = .identifier, .lexeme = "reader" },
+        .{ .type = .pipe, .lexeme = "|" },
+        .{ .type = .identifier, .lexeme = "organisation" },
+        .{ .type = .dot, .lexeme = "." },
+        .{ .type = .identifier, .lexeme = "admins" },
+        .{ .type = .r_paren, .lexeme = ")" },
+        .{ .type = .minus, .lexeme = "-" },
+        .{ .type = .identifier, .lexeme = "blocked" },
+        .{ .type = .r_brace, .lexeme = "}" },
+        .{ .type = .eof, .lexeme = "" },
+    };
+
+    try expectTokens(input, &expected);
 }

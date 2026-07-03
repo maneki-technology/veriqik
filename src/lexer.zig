@@ -12,7 +12,6 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "with", TokenType.kw_with },
     .{ "in", TokenType.kw_in },
     .{ "self", TokenType.kw_self },
-    .{ "resource", TokenType.kw_resource },
 });
 
 pub const Lexer = struct {
@@ -104,12 +103,8 @@ pub const Lexer = struct {
         return self.input[self.readPos];
     }
 
-    fn isWhitespace(self: *Lexer) bool {
-        return self.ch == ' ' or self.ch == '\t' or self.ch == '\n' or self.ch == '\r';
-    }
-
     fn eatWhitespace(self: *Lexer) void {
-        while (self.isWhitespace()) {
+        while (std.ascii.isWhitespace(self.ch)) {
             self.readChar();
         }
     }
@@ -177,13 +172,17 @@ pub const Lexer = struct {
         return t;
     }
 
-    fn isAlpha(self: *Lexer) bool {
-        return (self.ch >= 'a' and self.ch <= 'z') or (self.ch >= 'A' and self.ch <= 'Z');
+    fn isIdenStart(self: *Lexer) bool {
+        return std.ascii.isAlphabetic(self.ch) or self.ch == '_';
+    }
+
+    fn isIdenContinue(self: *Lexer) bool {
+        return std.ascii.isAlphanumeric(self.ch) or self.ch == '_';
     }
 
     fn readIdentifierToken(self: *Lexer) Token {
         var t = Token{ .type = TokenType.identifier, .start = self.pos, .end = self.pos };
-        while (self.isAlpha()) {
+        while (self.isIdenContinue()) {
             self.readChar();
         }
         t.end = self.pos;
@@ -212,7 +211,7 @@ pub const Lexer = struct {
                 t = self.readLookaheadCharToken();
             },
             else => {
-                if (self.isAlpha()) {
+                if (self.isIdenStart()) {
                     t = self.readIdentifierToken();
                     return t;
                 }
@@ -301,7 +300,7 @@ test "lookahead tokens same first char consecutive" {
 }
 
 test "keywords" {
-    const input = "type relation permission condition with in self resource";
+    const input = "type relation permission condition with in self";
     var lexer = Lexer.init(input);
     const expected = [_]Token{
         Token{ .type = TokenType.kw_type, .start = 0, .end = 4 },
@@ -311,8 +310,7 @@ test "keywords" {
         Token{ .type = TokenType.kw_with, .start = 35, .end = 39 },
         Token{ .type = TokenType.kw_in, .start = 40, .end = 42 },
         Token{ .type = TokenType.kw_self, .start = 43, .end = 47 },
-        Token{ .type = TokenType.kw_resource, .start = 48, .end = 56 },
-        Token{ .type = TokenType.eof, .start = 56, .end = 56 },
+        Token{ .type = TokenType.eof, .start = 47, .end = 47 },
     };
     var i: usize = 0;
     while (i < expected.len) : (i += 1) {
@@ -324,13 +322,15 @@ test "keywords" {
 }
 
 test "identifiers" {
-    const input = "foo bar baz";
+    const input = "foo bar baz foo_bar foo1";
     var lexer = Lexer.init(input);
     const expected = [_]Token{
         Token{ .type = TokenType.identifier, .start = 0, .end = 3 },
         Token{ .type = TokenType.identifier, .start = 4, .end = 7 },
         Token{ .type = TokenType.identifier, .start = 8, .end = 11 },
-        Token{ .type = TokenType.eof, .start = 11, .end = 11 },
+        Token{ .type = TokenType.identifier, .start = 12, .end = 19 },
+        Token{ .type = TokenType.identifier, .start = 20, .end = 24 },
+        Token{ .type = TokenType.eof, .start = 24, .end = 24 },
     };
     var i: usize = 0;
     while (i < expected.len) : (i += 1) {

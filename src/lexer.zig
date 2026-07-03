@@ -236,16 +236,19 @@ pub const Lexer = struct {
 
     pub fn next(self: *Lexer) Token {
         self.eatTrivia();
+        if (self.pos >= self.input.len) {
+            return Token{
+                .type = TokenType.eof,
+                .start = self.pos,
+                .end = self.pos,
+            };
+        }
         var t = Token{
             .type = TokenType.illegal,
             .start = self.pos,
             .end = self.readPos,
         };
         switch (self.ch) {
-            0 => {
-                t.type = TokenType.eof;
-                t.end = self.pos;
-            },
             '&', '|', '-', '?', ':', ',', '*', '#', '{', '}', '[', ']', '(', ')' => {
                 t = self.readSingleCharToken();
             },
@@ -368,6 +371,18 @@ test "illegal characters" {
         .{ .type = .illegal, .lexeme = "\\" }, .{ .type = .illegal, .lexeme = "/" },
         .{ .type = .illegal, .lexeme = "@" },  .{ .type = .illegal, .lexeme = "$" },
         .{ .type = .illegal, .lexeme = "%" },  .{ .type = .eof, .lexeme = "" },
+    };
+    try expectTokens(input, &expected);
+}
+
+test "embedded null" {
+    const input = "\x00User\x00Service\x00";
+    const expected = [_]ExpectedToken{
+        .{ .type = .illegal, .lexeme = "\x00" },
+        .{ .type = .identifier, .lexeme = "User" },
+        .{ .type = .illegal, .lexeme = "\x00" },
+        .{ .type = .identifier, .lexeme = "Service" },
+        .{ .type = .illegal, .lexeme = "\x00" },
     };
     try expectTokens(input, &expected);
 }

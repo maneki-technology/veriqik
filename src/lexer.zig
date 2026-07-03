@@ -376,7 +376,7 @@ test "integers" {
     }
 }
 
-test "simple type with qualifier" {
+test "simple type with cardinality bounds" {
     const input =
         \\type Team {
         \\    relation member[0..10]: User

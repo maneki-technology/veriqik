@@ -86,7 +86,7 @@ pub const Lexer = struct {
         return t;
     }
 
-    fn peekChar(self: *Lexer) u8 {
+    fn peek(self: *Lexer) u8 {
         if (self.readPos >= self.input.len) {
             return 0;
         }
@@ -109,7 +109,7 @@ pub const Lexer = struct {
             .start = self.pos,
             .end = self.readPos,
         };
-        const nextCh = self.peekChar();
+        const nextCh = self.peek();
         switch (self.ch) {
             '=' => {
                 if (nextCh == '=') {

@@ -1,4 +1,4 @@
-pub const TokenType = enum {
+pub const TokenType = enum(u8) {
     illegal,
     eof,
 
@@ -56,7 +56,7 @@ pub const TokenType = enum {
 };
 
 pub const Token = struct {
-    type: TokenType,
     start: usize,
     end: usize,
+    type: TokenType,
 };

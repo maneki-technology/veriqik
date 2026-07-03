@@ -10,14 +10,11 @@ pub const TokenType = enum(u8) {
     kw_with,
     kw_in,
     kw_self,
-    kw_resource,
 
     // Names and literals
     identifier,
     integer_literal,
     string_literal,
-    kw_true,
-    kw_false,
 
     // Punctuation
     assign, // =

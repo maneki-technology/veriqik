@@ -13,8 +13,7 @@ pub const TokenType = enum(u8) {
 
     // Names and literals
     identifier,
-    integer_literal,
-    string_literal,
+    integer,
 
     // Punctuation
     assign, // =

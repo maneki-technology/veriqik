@@ -180,6 +180,10 @@ pub const Lexer = struct {
         return std.ascii.isAlphanumeric(self.ch) or self.ch == '_';
     }
 
+    fn isDigit(self: *Lexer) bool {
+        return std.ascii.isDigit(self.ch);
+    }
+
     fn readIdentifierToken(self: *Lexer) Token {
         var t = Token{ .type = TokenType.identifier, .start = self.pos, .end = self.pos };
         while (self.isIdenContinue()) {
@@ -189,6 +193,15 @@ pub const Lexer = struct {
         if (keywords.get(self.input[t.start..t.end])) |kw| {
             t.type = kw;
         }
+        return t;
+    }
+
+    fn readNumberToken(self: *Lexer) Token {
+        var t = Token{ .type = TokenType.integer, .start = self.pos, .end = self.pos };
+        while (self.isDigit()) {
+            self.readChar();
+        }
+        t.end = self.pos;
         return t;
     }
 
@@ -213,6 +226,10 @@ pub const Lexer = struct {
             else => {
                 if (self.isIdenStart()) {
                     t = self.readIdentifierToken();
+                    return t;
+                }
+                if (self.isDigit()) {
+                    t = self.readNumberToken();
                     return t;
                 }
             },
@@ -341,10 +358,28 @@ test "identifiers" {
     }
 }
 
-test "simple type" {
+test "integers" {
+    const input = "0 1 1234567890";
+    var lexer = Lexer.init(input);
+    const expected = [_]Token{
+        Token{ .type = TokenType.integer, .start = 0, .end = 1 },
+        Token{ .type = TokenType.integer, .start = 2, .end = 3 },
+        Token{ .type = TokenType.integer, .start = 4, .end = 14 },
+        Token{ .type = TokenType.eof, .start = 14, .end = 14 },
+    };
+    var i: usize = 0;
+    while (i < expected.len) : (i += 1) {
+        const t = lexer.next();
+        try testing.expectEqual(expected[i].type, t.type);
+        try testing.expectEqual(expected[i].start, t.start);
+        try testing.expectEqual(expected[i].end, t.end);
+    }
+}
+
+test "simple type with qualifier" {
     const input =
         \\type Team {
-        \\    relation member: User
+        \\    relation member[0..10]: User
         \\    permission members = member
         \\}
     ;
@@ -355,14 +390,19 @@ test "simple type" {
         Token{ .type = TokenType.l_brace, .start = 10, .end = 11 },
         Token{ .type = TokenType.kw_relation, .start = 16, .end = 24 },
         Token{ .type = TokenType.identifier, .start = 25, .end = 31 },
-        Token{ .type = TokenType.colon, .start = 31, .end = 32 },
-        Token{ .type = TokenType.identifier, .start = 33, .end = 37 },
-        Token{ .type = TokenType.kw_permission, .start = 42, .end = 52 },
-        Token{ .type = TokenType.identifier, .start = 53, .end = 60 },
-        Token{ .type = TokenType.assign, .start = 61, .end = 62 },
-        Token{ .type = TokenType.identifier, .start = 63, .end = 69 },
-        Token{ .type = TokenType.r_brace, .start = 70, .end = 71 },
-        Token{ .type = TokenType.eof, .start = 71, .end = 71 },
+        Token{ .type = TokenType.l_bracket, .start = 31, .end = 32 },
+        Token{ .type = TokenType.integer, .start = 32, .end = 33 },
+        Token{ .type = TokenType.range, .start = 33, .end = 35 },
+        Token{ .type = TokenType.integer, .start = 35, .end = 37 },
+        Token{ .type = TokenType.r_bracket, .start = 37, .end = 38 },
+        Token{ .type = TokenType.colon, .start = 38, .end = 39 },
+        Token{ .type = TokenType.identifier, .start = 40, .end = 44 },
+        Token{ .type = TokenType.kw_permission, .start = 49, .end = 59 },
+        Token{ .type = TokenType.identifier, .start = 60, .end = 67 },
+        Token{ .type = TokenType.assign, .start = 68, .end = 69 },
+        Token{ .type = TokenType.identifier, .start = 70, .end = 76 },
+        Token{ .type = TokenType.r_brace, .start = 77, .end = 78 },
+        Token{ .type = TokenType.eof, .start = 78, .end = 78 },
     };
     var i: usize = 0;
     while (i < expected.len) : (i += 1) {

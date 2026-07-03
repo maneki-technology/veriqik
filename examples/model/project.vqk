@@ -1,0 +1,60 @@
+type User {}
+
+type Service {
+  relation allowed_networks: Network // Network is predefined type, i.e: 10.0.0.0/8
+}
+
+condition allowed_ip(source_ip: IpAddress) { // IpAddress is predefined type, i.e: 10.0.0.1
+  self.allowed_networks.any(
+    network,
+    network.contains(source_ip)
+  )
+}
+
+type Team {
+  relation member: User with expiration?
+  permission members = member
+}
+
+type Workspace {
+  relation member: User with expiration?
+  relation team: Team with expiration?
+  relation service: Service with expiration? & allowed_ip?
+
+  relation admin:
+    User with (u in member) |
+    Team#member with (t in team) |
+    Service with (s in service) & expiration & allowed_ip
+
+  relation banned: User | Service
+
+  permission admins = admin - banned
+  permission members =
+    (member | team.members | service) - banned
+}
+
+type Project {
+  relation workspace[1..1]: Workspace
+
+  relation reader:
+    User with expiration? |
+    Team#member with (t in workspace.team) & expiration? |
+    Service with expiration?
+
+  relation writer:
+    User with expiration? |
+    Team#member with (t in workspace.team) & expiration? |
+    Service with expiration?
+
+  relation owner:
+    User with expiration? |
+    Team#member with (t in workspace.team) & expiration?
+
+  relation banned: User | Team#member | Service
+
+  permission eligible = workspace.members - banned
+  permission manage = (owner | workspace.admins) & eligible
+  permission write = (writer | manage) & eligible
+  permission read = (reader | write) & eligible
+}
+

@@ -18,27 +18,34 @@ pub const Lexer = struct {
     input: []const u8,
     pos: usize,
     readPos: usize,
-    ch: u8,
 
     pub fn init(input: []const u8) Lexer {
         var lexer = Lexer{
             .input = input,
             .pos = 0,
             .readPos = 0,
-            .ch = 0,
         };
 
         lexer.readChar();
         return lexer;
     }
 
+    fn isAtEnd(self: *Lexer) bool {
+        return self.pos >= self.input.len;
+    }
+
+    fn current(self: *Lexer) u8 {
+        if (self.isAtEnd()) {
+            return 0;
+        }
+        return self.input[self.pos];
+    }
+
     fn readChar(self: *Lexer) void {
         self.pos = self.readPos;
-        if (self.readPos >= self.input.len) {
-            self.ch = 0;
+        if (self.isAtEnd()) {
             return;
         }
-        self.ch = self.input[self.readPos];
         self.readPos += 1;
     }
 
@@ -48,7 +55,7 @@ pub const Lexer = struct {
             .start = self.pos,
             .end = self.readPos,
         };
-        switch (self.ch) {
+        switch (self.current()) {
             '&' => {
                 t.type = TokenType.ampersand;
             },
@@ -110,7 +117,7 @@ pub const Lexer = struct {
             .end = self.readPos,
         };
         const nextCh = self.peek();
-        switch (self.ch) {
+        switch (self.current()) {
             '=' => {
                 if (nextCh == '=') {
                     t.type = TokenType.equal_equal;
@@ -167,11 +174,11 @@ pub const Lexer = struct {
     }
 
     fn isIdenStart(self: *Lexer) bool {
-        return std.ascii.isAlphabetic(self.ch) or self.ch == '_';
+        return std.ascii.isAlphabetic(self.current()) or self.current() == '_';
     }
 
     fn isIdenContinue(self: *Lexer) bool {
-        return std.ascii.isAlphanumeric(self.ch) or self.ch == '_';
+        return std.ascii.isAlphanumeric(self.current()) or self.current() == '_';
     }
 
     fn readIdentifierToken(self: *Lexer) Token {
@@ -187,7 +194,7 @@ pub const Lexer = struct {
     }
 
     fn isDigit(self: *Lexer) bool {
-        return std.ascii.isDigit(self.ch);
+        return std.ascii.isDigit(self.current());
     }
 
     fn readNumberToken(self: *Lexer) Token {
@@ -201,14 +208,14 @@ pub const Lexer = struct {
 
     fn isCommentStart(self: *Lexer) bool {
         const nextCh = self.peek();
-        return nextCh == '/' and self.ch == '/';
+        return nextCh == '/' and self.current() == '/';
     }
 
     fn isCommentEnd(self: *Lexer) bool {
         if (self.readPos >= self.input.len) {
             return true;
         }
-        return self.ch == '\n' or self.ch == '\r';
+        return self.current() == '\n' or self.current() == '\r';
     }
 
     fn eatComment(self: *Lexer) void {
@@ -219,7 +226,7 @@ pub const Lexer = struct {
     }
 
     fn eatWhitespace(self: *Lexer) void {
-        while (std.ascii.isWhitespace(self.ch)) {
+        while (std.ascii.isWhitespace(self.current())) {
             self.readChar();
         }
     }
@@ -236,7 +243,7 @@ pub const Lexer = struct {
 
     pub fn next(self: *Lexer) Token {
         self.eatTrivia();
-        if (self.pos >= self.input.len) {
+        if (self.isAtEnd()) {
             return Token{
                 .type = TokenType.eof,
                 .start = self.pos,
@@ -248,7 +255,7 @@ pub const Lexer = struct {
             .start = self.pos,
             .end = self.readPos,
         };
-        switch (self.ch) {
+        switch (self.current()) {
             '&', '|', '-', '?', ':', ',', '*', '#', '{', '}', '[', ']', '(', ')' => {
                 t = self.readSingleCharToken();
             },

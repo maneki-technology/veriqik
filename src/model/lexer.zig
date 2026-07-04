@@ -17,16 +17,13 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
 pub const Lexer = struct {
     input: []const u8,
     pos: usize,
-    readPos: usize,
 
     pub fn init(input: []const u8) Lexer {
-        var lexer = Lexer{
+        const lexer = Lexer{
             .input = input,
             .pos = 0,
-            .readPos = 0,
         };
 
-        lexer.readChar();
         return lexer;
     }
 
@@ -41,19 +38,15 @@ pub const Lexer = struct {
         return self.input[self.pos];
     }
 
-    fn readChar(self: *Lexer) void {
-        self.pos = self.readPos;
-        if (self.isAtEnd()) {
-            return;
-        }
-        self.readPos += 1;
+    fn advance(self: *Lexer) void {
+        self.pos += 1;
     }
 
     fn readSingleCharToken(self: *Lexer) Token {
         var t = Token{
             .type = TokenType.illegal,
             .start = self.pos,
-            .end = self.readPos,
+            .end = self.pos + 1,
         };
         switch (self.current()) {
             '&' => {
@@ -104,25 +97,25 @@ pub const Lexer = struct {
     }
 
     fn peek(self: *Lexer) u8 {
-        if (self.readPos >= self.input.len) {
+        if (self.pos + 1 >= self.input.len) {
             return 0;
         }
-        return self.input[self.readPos];
+        return self.input[self.pos + 1];
     }
 
     fn readLookaheadCharToken(self: *Lexer) Token {
         var t = Token{
             .type = TokenType.illegal,
             .start = self.pos,
-            .end = self.readPos,
+            .end = self.pos + 1,
         };
         const nextCh = self.peek();
         switch (self.current()) {
             '=' => {
                 if (nextCh == '=') {
                     t.type = TokenType.equal_equal;
-                    t.end = self.readPos + 1;
-                    self.readChar();
+                    t.end = self.pos + 1 + 1;
+                    self.advance();
                 } else {
                     t.type = TokenType.assign;
                     return t;
@@ -131,8 +124,8 @@ pub const Lexer = struct {
             '<' => {
                 if (nextCh == '=') {
                     t.type = TokenType.less_equal;
-                    t.end = self.readPos + 1;
-                    self.readChar();
+                    t.end = self.pos + 1 + 1;
+                    self.advance();
                 } else {
                     t.type = TokenType.less;
                     return t;
@@ -141,8 +134,8 @@ pub const Lexer = struct {
             '>' => {
                 if (nextCh == '=') {
                     t.type = TokenType.greater_equal;
-                    t.end = self.readPos + 1;
-                    self.readChar();
+                    t.end = self.pos + 1 + 1;
+                    self.advance();
                 } else {
                     t.type = TokenType.greater;
                     return t;
@@ -151,8 +144,8 @@ pub const Lexer = struct {
             '!' => {
                 if (nextCh == '=') {
                     t.type = TokenType.bang_equal;
-                    t.end = self.readPos + 1;
-                    self.readChar();
+                    t.end = self.pos + 1 + 1;
+                    self.advance();
                 } else {
                     t.type = TokenType.bang;
                     return t;
@@ -161,8 +154,8 @@ pub const Lexer = struct {
             '.' => {
                 if (nextCh == '.') {
                     t.type = TokenType.range;
-                    t.end = self.readPos + 1;
-                    self.readChar();
+                    t.end = self.pos + 1 + 1;
+                    self.advance();
                 } else {
                     t.type = TokenType.dot;
                     return t;
@@ -184,7 +177,7 @@ pub const Lexer = struct {
     fn readIdentifierToken(self: *Lexer) Token {
         var t = Token{ .type = TokenType.identifier, .start = self.pos, .end = self.pos };
         while (self.isIdenContinue()) {
-            self.readChar();
+            self.advance();
         }
         t.end = self.pos;
         if (keywords.get(self.input[t.start..t.end])) |kw| {
@@ -200,7 +193,7 @@ pub const Lexer = struct {
     fn readNumberToken(self: *Lexer) Token {
         var t = Token{ .type = TokenType.integer, .start = self.pos, .end = self.pos };
         while (self.isDigit()) {
-            self.readChar();
+            self.advance();
         }
         t.end = self.pos;
         return t;
@@ -212,7 +205,7 @@ pub const Lexer = struct {
     }
 
     fn isCommentEnd(self: *Lexer) bool {
-        if (self.readPos >= self.input.len) {
+        if (self.pos + 1 >= self.input.len) {
             return true;
         }
         return self.current() == '\n' or self.current() == '\r';
@@ -220,14 +213,14 @@ pub const Lexer = struct {
 
     fn eatComment(self: *Lexer) void {
         while (!self.isCommentEnd()) {
-            self.readChar();
+            self.advance();
         }
-        self.readChar();
+        self.advance();
     }
 
     fn eatWhitespace(self: *Lexer) void {
         while (std.ascii.isWhitespace(self.current())) {
-            self.readChar();
+            self.advance();
         }
     }
 
@@ -253,7 +246,7 @@ pub const Lexer = struct {
         var t = Token{
             .type = TokenType.illegal,
             .start = self.pos,
-            .end = self.readPos,
+            .end = self.pos + 1,
         };
         switch (self.current()) {
             '&', '|', '-', '?', ':', ',', '*', '#', '{', '}', '[', ']', '(', ')' => {
@@ -273,7 +266,7 @@ pub const Lexer = struct {
                 }
             },
         }
-        self.readChar();
+        self.advance();
         return t;
     }
 };

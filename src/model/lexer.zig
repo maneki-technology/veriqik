@@ -39,6 +39,9 @@ pub const Lexer = struct {
     }
 
     fn advance(self: *Lexer) void {
+        if (self.isAtEnd()) {
+            return;
+        }
         self.pos += 1;
     }
 
@@ -277,6 +280,9 @@ const ExpectedToken = struct {
 };
 
 fn expectTokens(input: []const u8, expected: []const ExpectedToken) !void {
+    try testing.expect(expected.len > 0);
+    try testing.expectEqual(TokenType.eof, expected[expected.len - 1].type);
+
     var lexer = Lexer.init(input);
     for (expected) |want| {
         const actual = lexer.next();
@@ -383,6 +389,7 @@ test "embedded null" {
         .{ .type = .illegal, .lexeme = "\x00" },
         .{ .type = .identifier, .lexeme = "Service" },
         .{ .type = .illegal, .lexeme = "\x00" },
+        .{ .type = .eof, .lexeme = "" },
     };
     try expectTokens(input, &expected);
 }

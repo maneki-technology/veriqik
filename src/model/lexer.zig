@@ -112,10 +112,9 @@ pub const Lexer = struct {
             .start = self.pos,
             .end = self.pos + 1,
         };
-        const nextCh = self.peek();
         switch (self.current()) {
             '=' => {
-                if (nextCh == '=') {
+                if (self.peek() == '=') {
                     t.type = TokenType.equal_equal;
                     t.end = self.pos + 2;
                     self.advance();
@@ -125,7 +124,7 @@ pub const Lexer = struct {
                 }
             },
             '<' => {
-                if (nextCh == '=') {
+                if (self.peek() == '=') {
                     t.type = TokenType.less_equal;
                     t.end = self.pos + 2;
                     self.advance();
@@ -135,7 +134,7 @@ pub const Lexer = struct {
                 }
             },
             '>' => {
-                if (nextCh == '=') {
+                if (self.peek() == '=') {
                     t.type = TokenType.greater_equal;
                     t.end = self.pos + 2;
                     self.advance();
@@ -145,7 +144,7 @@ pub const Lexer = struct {
                 }
             },
             '!' => {
-                if (nextCh == '=') {
+                if (self.peek() == '=') {
                     t.type = TokenType.bang_equal;
                     t.end = self.pos + 2;
                     self.advance();
@@ -155,7 +154,7 @@ pub const Lexer = struct {
                 }
             },
             '.' => {
-                if (nextCh == '.') {
+                if (self.peek() == '.') {
                     t.type = TokenType.range;
                     t.end = self.pos + 2;
                     self.advance();
@@ -170,11 +169,13 @@ pub const Lexer = struct {
     }
 
     fn isIdenStart(self: *Lexer) bool {
-        return std.ascii.isAlphabetic(self.current()) or self.current() == '_';
+        const ch = self.current();
+        return std.ascii.isAlphabetic(ch) or ch == '_';
     }
 
     fn isIdenContinue(self: *Lexer) bool {
-        return std.ascii.isAlphanumeric(self.current()) or self.current() == '_';
+        const ch = self.current();
+        return std.ascii.isAlphanumeric(ch) or ch == '_';
     }
 
     fn readIdentifierToken(self: *Lexer) Token {
@@ -190,7 +191,8 @@ pub const Lexer = struct {
     }
 
     fn isDigit(self: *Lexer) bool {
-        return std.ascii.isDigit(self.current());
+        const ch = self.current();
+        return std.ascii.isDigit(ch);
     }
 
     fn readNumberToken(self: *Lexer) Token {
@@ -203,8 +205,7 @@ pub const Lexer = struct {
     }
 
     fn isCommentStart(self: *Lexer) bool {
-        const nextCh = self.peek();
-        return nextCh == '/' and self.current() == '/';
+        return self.peek() == '/' and self.current() == '/';
     }
 
     fn isCommentEnd(self: *Lexer) bool {

@@ -117,7 +117,7 @@ pub const Lexer = struct {
             '=' => {
                 if (nextCh == '=') {
                     t.type = TokenType.equal_equal;
-                    t.end = self.pos + 1 + 1;
+                    t.end = self.pos + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.assign;
@@ -127,7 +127,7 @@ pub const Lexer = struct {
             '<' => {
                 if (nextCh == '=') {
                     t.type = TokenType.less_equal;
-                    t.end = self.pos + 1 + 1;
+                    t.end = self.pos + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.less;
@@ -137,7 +137,7 @@ pub const Lexer = struct {
             '>' => {
                 if (nextCh == '=') {
                     t.type = TokenType.greater_equal;
-                    t.end = self.pos + 1 + 1;
+                    t.end = self.pos + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.greater;
@@ -147,7 +147,7 @@ pub const Lexer = struct {
             '!' => {
                 if (nextCh == '=') {
                     t.type = TokenType.bang_equal;
-                    t.end = self.pos + 1 + 1;
+                    t.end = self.pos + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.bang;
@@ -157,7 +157,7 @@ pub const Lexer = struct {
             '.' => {
                 if (nextCh == '.') {
                     t.type = TokenType.range;
-                    t.end = self.pos + 1 + 1;
+                    t.end = self.pos + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.dot;

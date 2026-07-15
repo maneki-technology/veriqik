@@ -43,8 +43,6 @@ test "fuzz example" {
     try std.testing.fuzz({}, testOne, .{});
 }
 
-
-
 fn testOne(context: void, smith: *std.testing.Smith) !void {
     _ = context;
     // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!

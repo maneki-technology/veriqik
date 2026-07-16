@@ -212,7 +212,8 @@ pub const Lexer = struct {
         if (self.pos + 1 >= self.input.len) {
             return true;
         }
-        return self.current() == '\n' or self.current() == '\r';
+        const ch = self.current();
+        return ch == '\n' or ch == '\r';
     }
 
     fn eatComment(self: *Lexer) void {

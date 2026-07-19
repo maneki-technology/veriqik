@@ -19,7 +19,7 @@ const ParserError = error{
     UnexpectedToken,
 } || std.mem.Allocator.Error;
 
-const Parser = struct {
+pub const Parser = struct {
     allocator: std.mem.Allocator,
     l: Lexer,
     i: Interner,

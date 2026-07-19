@@ -61,7 +61,6 @@ pub const Parser = struct {
                     const type_decl = try self.parseType();
                     try types.append(self.allocator, type_decl);
                 },
-                TokenType.kw_condition => {},
                 TokenType.illegal => {
                     return ParserError.IllegalCharacter;
                 },

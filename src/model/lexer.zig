@@ -239,6 +239,14 @@ pub const Lexer = struct {
         }
     }
 
+    // This assumes that the token is from the same source created by this lexer.
+    // Currently we don't have a way to enforce this.
+    pub fn lexeme(self: *Lexer, t: Token) []const u8 {
+        std.debug.assert(t.start <= t.end);
+        std.debug.assert(t.end <= self.input.len);
+        return self.input[t.start..t.end];
+    }
+
     pub fn next(self: *Lexer) Token {
         self.eatTrivia();
         if (self.isAtEnd()) {
@@ -289,7 +297,7 @@ fn expectTokens(input: []const u8, expected: []const ExpectedToken) !void {
     for (expected) |want| {
         const actual = lexer.next();
         try testing.expectEqual(want.type, actual.type);
-        try testing.expectEqualStrings(want.lexeme, input[actual.start..actual.end]);
+        try testing.expectEqualStrings(want.lexeme, lexer.lexeme(actual));
         if (actual.type == .eof) {
             try testing.expectEqual(input.len, actual.start);
             try testing.expectEqual(input.len, actual.end);

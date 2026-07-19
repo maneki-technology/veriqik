@@ -140,7 +140,28 @@ test "parse model with simple type" {
                     .symbol = SymbolId.fromInt(0),
                     .span = .{ .start = 5, .end = 9 },
                 },
-                .span = .{ .start = 0, .end = 12 },
+                .span = .{ .start = 0, .end = source.len },
+            },
+        },
+    };
+
+    try expectModel(source, expected);
+}
+
+test "parse model with type with body" {
+    const source =
+        \\type Group {
+        \\  relation member[0..10]: User
+        \\}
+    ;
+    const expected = ast.Model{
+        .types = &[_]ast.Type{
+            .{
+                .name = .{
+                    .symbol = SymbolId.fromInt(0),
+                    .span = .{ .start = 5, .end = 10 },
+                },
+                .span = .{ .start = 0, .end = source.len },
             },
         },
     };

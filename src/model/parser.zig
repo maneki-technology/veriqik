@@ -52,7 +52,7 @@ pub const Parser = struct {
         self.peekToken = self.l.next();
     }
 
-    fn parseModel(self: *Parser) !ast.Model {
+    pub fn parseModel(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
         errdefer types.deinit(self.allocator);
         while (self.curToken.?.type != TokenType.eof) : (self.advance()) {

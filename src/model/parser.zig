@@ -100,6 +100,12 @@ const Parser = struct {
                     end = curToken.end;
                     break;
                 },
+                TokenType.illegal => {
+                    return ParserError.IllegalCharacter;
+                },
+                TokenType.eof => {
+                    return ParserError.UnexpectedToken;
+                },
                 else => {
                     // TODO: parse relations and permissions
                 },
@@ -167,4 +173,18 @@ test "parse model with type with body" {
     };
 
     try expectModel(source, expected);
+}
+
+test "parse model with type with illegal character" {
+    const source = "type User { @ }";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.IllegalCharacter, parser.parseModel());
+}
+
+test "parse model missing closing brace" {
+    const source = "type User { relation member[0..10]: User";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
 }

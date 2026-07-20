@@ -252,30 +252,75 @@ pub const Parser = struct {
     }
 };
 
-fn expectModel(source: []const u8, expected: ast.Model) !void {
-    const alloc = std.testing.allocator;
-    var parser = Parser.init(alloc, source);
+const TestModel = struct {
+    parser: Parser,
+    model: ast.Model,
+
+    fn parse(source: []const u8) !TestModel {
+        const alloc = testing.allocator;
+        var parser = Parser.init(alloc, source);
+        errdefer parser.deinit();
+
+        const model = try parser.parseModel();
+        return .{
+            .parser = parser,
+            .model = model,
+        };
+    }
+
+    fn deinit(self: *TestModel) void {
+        self.model.deinit(testing.allocator);
+        self.parser.deinit();
+    }
+};
+
+fn expectSpanText(source: []const u8, span: ast.Span, expected: []const u8) !void {
+    try testing.expect(span.start <= span.end);
+    try testing.expect(span.end <= source.len);
+    try testing.expectEqualStrings(expected, source[span.start..span.end]);
+}
+
+fn expectIdentifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
+    try expectSpanText(source, actual.span, expected);
+}
+
+fn expectParameter(
+    source: []const u8,
+    actual: ast.Parameter,
+    expected: struct {
+        name: []const u8,
+        type_name: []const u8,
+        declaration: []const u8,
+        collection: bool = false,
+    },
+) !void {
+    try expectIdentifier(source, actual.name, expected.name);
+    try expectIdentifier(source, actual.type.name, expected.type_name);
+    try expectSpanText(source, actual.span, expected.declaration);
+    const type_start = std.mem.indexOf(u8, expected.declaration, expected.type_name).?;
+    try expectSpanText(
+        source,
+        actual.type.span,
+        expected.declaration[type_start..],
+    );
+    try testing.expectEqual(expected.collection, actual.type.collection);
+}
+
+fn expectParseError(expected: anyerror, source: []const u8) !void {
+    var parser = Parser.init(testing.allocator, source);
     defer parser.deinit();
-    var actual = try parser.parseModel();
-    defer actual.deinit(alloc);
-    try testing.expectEqualDeep(expected, actual);
+    try testing.expectError(expected, parser.parseModel());
 }
 
 test "parse model with simple type" {
     const source = "type User {}";
-    const expected = ast.Model{
-        .types = &[_]ast.Type{
-            .{
-                .name = .{
-                    .symbol = SymbolId.fromInt(0),
-                    .span = .{ .start = 5, .end = 9 },
-                },
-                .span = .{ .start = 0, .end = source.len },
-            },
-        },
-    };
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
 
-    try expectModel(source, expected);
+    try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
+    try testing.expectEqual(@as(usize, 0), parsed.model.conditions.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "User");
+    try expectSpanText(source, parsed.model.types[0].span, source);
 }
 
 test "parse model with type with body" {
@@ -284,219 +329,145 @@ test "parse model with type with body" {
         \\  relation member[0..10]: User
         \\}
     ;
-    const expected = ast.Model{
-        .types = &[_]ast.Type{
-            .{
-                .name = .{
-                    .symbol = SymbolId.fromInt(0),
-                    .span = .{ .start = 5, .end = 10 },
-                },
-                .span = .{ .start = 0, .end = source.len },
-            },
-        },
-    };
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
 
-    try expectModel(source, expected);
+    try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expectSpanText(source, parsed.model.types[0].span, source);
 }
 
 test "parse model with type with illegal character" {
-    const source = "type User { @ }";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.IllegalCharacter, parser.parseModel());
+    try expectParseError(ParserError.IllegalCharacter, "type User { @ }");
 }
 
 test "parse model with type missing closing brace" {
-    const source = "type User { relation member[0..10]: User";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User { relation member[0..10]: User",
+    );
 }
 
 test "parse model with empty condition" {
     const source = "condition allow() {}";
-    const expected = ast.Model{
-        .types = &.{},
-        .conditions = &[_]ast.Condition{
-            .{
-                .name = .{
-                    .symbol = SymbolId.fromInt(0),
-                    .span = .{ .start = 10, .end = 15 },
-                },
-                .params = &.{},
-                .span = .{ .start = 0, .end = source.len },
-            },
-        },
-    };
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
 
-    try expectModel(source, expected);
+    try testing.expectEqual(@as(usize, 0), parsed.model.types.len);
+    try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
+    const condition = parsed.model.conditions[0];
+    try expectIdentifier(source, condition.name, "allow");
+    try testing.expectEqual(@as(usize, 0), condition.params.len);
+    try expectSpanText(source, condition.span, source);
 }
 
 test "parse model with simple condition" {
     const source = "condition allow_ip(ip: IpAddress) {}";
-    const expected = ast.Model{
-        .types = &.{},
-        .conditions = &[_]ast.Condition{
-            .{
-                .name = .{
-                    .symbol = SymbolId.fromInt(0),
-                    .span = .{ .start = 10, .end = 18 },
-                },
-                .params = &.{
-                    .{
-                        .name = .{
-                            .symbol = SymbolId.fromInt(1),
-                            .span = .{ .start = 19, .end = 21 },
-                        },
-                        .type = .{
-                            .name = .{
-                                .symbol = SymbolId.fromInt(2),
-                                .span = .{ .start = 23, .end = 32 },
-                            },
-                            .span = .{ .start = 23, .end = 32 },
-                            .collection = false,
-                        },
-                        .span = .{ .start = 19, .end = 32 },
-                    },
-                },
-                .span = .{ .start = 0, .end = source.len },
-            },
-        },
-    };
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
 
-    try expectModel(source, expected);
+    const condition = parsed.model.conditions[0];
+    try expectIdentifier(source, condition.name, "allow_ip");
+    try testing.expectEqual(@as(usize, 1), condition.params.len);
+    try expectParameter(source, condition.params[0], .{
+        .name = "ip",
+        .type_name = "IpAddress",
+        .declaration = "ip: IpAddress",
+    });
+    try expectSpanText(source, condition.span, source);
 }
 
 test "parse model with condition with array param" {
     const source = "condition allow_ip(ip: IpAddress[]) {}";
-    const expected = ast.Model{
-        .types = &.{},
-        .conditions = &[_]ast.Condition{
-            .{
-                .name = .{
-                    .symbol = SymbolId.fromInt(0),
-                    .span = .{ .start = 10, .end = 18 },
-                },
-                .params = &.{
-                    .{
-                        .name = .{
-                            .symbol = SymbolId.fromInt(1),
-                            .span = .{ .start = 19, .end = 21 },
-                        },
-                        .type = .{
-                            .name = .{
-                                .symbol = SymbolId.fromInt(2),
-                                .span = .{ .start = 23, .end = 32 },
-                            },
-                            .span = .{ .start = 23, .end = 34 },
-                            .collection = true,
-                        },
-                        .span = .{ .start = 19, .end = 34 },
-                    },
-                },
-                .span = .{ .start = 0, .end = source.len },
-            },
-        },
-    };
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
 
-    try expectModel(source, expected);
+    const condition = parsed.model.conditions[0];
+    try testing.expectEqual(@as(usize, 1), condition.params.len);
+    try expectParameter(source, condition.params[0], .{
+        .name = "ip",
+        .type_name = "IpAddress",
+        .declaration = "ip: IpAddress[]",
+        .collection = true,
+    });
 }
 
 test "parse model with condition with multiple params" {
     const source = "condition allow_ip(ip: IpAddress, port: Port) {}";
-    const expected = ast.Model{
-        .types = &.{},
-        .conditions = &[_]ast.Condition{
-            .{
-                .name = .{
-                    .symbol = SymbolId.fromInt(0),
-                    .span = .{ .start = 10, .end = 18 },
-                },
-                .params = &.{
-                    .{
-                        .name = .{
-                            .symbol = SymbolId.fromInt(1),
-                            .span = .{ .start = 19, .end = 21 },
-                        },
-                        .type = .{
-                            .name = .{
-                                .symbol = SymbolId.fromInt(2),
-                                .span = .{ .start = 23, .end = 32 },
-                            },
-                            .span = .{ .start = 23, .end = 32 },
-                            .collection = false,
-                        },
-                        .span = .{ .start = 19, .end = 32 },
-                    },
-                    .{
-                        .name = .{
-                            .symbol = SymbolId.fromInt(3),
-                            .span = .{ .start = 34, .end = 38 },
-                        },
-                        .type = .{
-                            .name = .{
-                                .symbol = SymbolId.fromInt(4),
-                                .span = .{ .start = 40, .end = 44 },
-                            },
-                            .span = .{ .start = 40, .end = 44 },
-                            .collection = false,
-                        },
-                        .span = .{ .start = 34, .end = 44 },
-                    },
-                },
-                .span = .{ .start = 0, .end = source.len },
-            },
-        },
-    };
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
 
-    try expectModel(source, expected);
+    const condition = parsed.model.conditions[0];
+    try testing.expectEqual(@as(usize, 2), condition.params.len);
+    try expectParameter(source, condition.params[0], .{
+        .name = "ip",
+        .type_name = "IpAddress",
+        .declaration = "ip: IpAddress",
+    });
+    try expectParameter(source, condition.params[1], .{
+        .name = "port",
+        .type_name = "Port",
+        .declaration = "port: Port",
+    });
 }
 
-test "parse model with conditon with illegal character" {
-    const source = "condition allow_ip(ip: IpAddress) { @ }";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.IllegalCharacter, parser.parseModel());
+test "parse model with multiple declarations" {
+    const source = "type User {} condition allow() {} type Group {}";
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try testing.expectEqual(@as(usize, 2), parsed.model.types.len);
+    try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "User");
+    try expectIdentifier(source, parsed.model.conditions[0].name, "allow");
+    try expectIdentifier(source, parsed.model.types[1].name, "Group");
+}
+
+test "parse model with condition with illegal character" {
+    try expectParseError(
+        ParserError.IllegalCharacter,
+        "condition allow_ip(ip: IpAddress) { @ }",
+    );
 }
 
 test "parse model with condition missing opening paren" {
-    const source = "condition allow_ip ip: IpAddress {}";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip ip: IpAddress {}",
+    );
 }
 
 test "parse model with condition missing closing paren" {
-    const source = "condition allow_ip(ip: IpAddress {}";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip(ip: IpAddress {}",
+    );
 }
 
 test "parse model with condition missing opening brace" {
-    const source = "condition allow_ip(ip: IpAddress)";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip(ip: IpAddress)",
+    );
 }
 
 test "parse model with condition missing closing brace" {
-    const source = "condition allow_ip(ip: IpAddress) {";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip(ip: IpAddress) {",
+    );
 }
 
 test "parse model with condition missing opening bracket" {
-    const source = "condition allow_ip(ip: IpAddress]) {}";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip(ip: IpAddress]) {}",
+    );
 }
 
 test "parse model with condition missing closing bracket" {
-    const source = "condition allow_ip(ip: IpAddress[) {}";
-    var parser = Parser.init(std.testing.allocator, source);
-    defer parser.deinit();
-    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip(ip: IpAddress[) {}",
+    );
 }

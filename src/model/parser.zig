@@ -62,7 +62,7 @@ pub const Parser = struct {
             }
             conditions.deinit(self.alloc);
         }
-        while (!self.currIs(.eof)) : (self.advance()) {
+        while (!self.currIs(.eof)) {
             switch (self.curr.type) {
                 .kw_type => {
                     const type_decl = try self.parseType();

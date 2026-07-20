@@ -208,24 +208,10 @@ pub const Parser = struct {
         return self.curr.type == expected;
     }
 
-    fn peekIs(self: *Parser, expected: TokenType) bool {
-        return self.peek.type == expected;
-    }
-
     fn expectCurr(self: *Parser, expected: TokenType) !void {
         if (!self.currIs(expected)) {
             return ParserError.UnexpectedToken;
         }
-    }
-
-    fn expectPeek(self: *Parser, expected: TokenType) !void {
-        if (!self.peekIs(expected)) {
-            return ParserError.UnexpectedToken;
-        }
-    }
-
-    fn currText(self: *Parser) []const u8 {
-        return self.l.lexeme(self.curr);
     }
 
     fn lexeme(self: *Parser, t: Token) []const u8 {

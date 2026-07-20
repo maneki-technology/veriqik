@@ -20,24 +20,24 @@ const ParserError = error{
 } || std.mem.Allocator.Error;
 
 pub const Parser = struct {
-    allocator: std.mem.Allocator,
+    alloc: std.mem.Allocator,
     l: Lexer,
     i: Interner,
-    curToken: ?Token,
-    peekToken: ?Token,
+    curr: Token,
+    peek: Token,
     // TODO: diagnostic/error state
 
     pub fn init(allocator: std.mem.Allocator, source: []const u8) Parser {
         var l = Lexer.init(source);
         const i = Interner.init(allocator, std.math.maxInt(u16));
-        const curToken = l.next();
-        const peekToken = l.next();
+        const curr = l.next();
+        const peek = l.next();
         const parser = Parser{
-            .allocator = allocator,
+            .alloc = allocator,
             .l = l,
             .i = i,
-            .curToken = curToken,
-            .peekToken = peekToken,
+            .curr = curr,
+            .peek = peek,
         };
         return parser;
     }
@@ -48,18 +48,18 @@ pub const Parser = struct {
     }
 
     fn advance(self: *Parser) void {
-        self.curToken = self.peekToken;
-        self.peekToken = self.l.next();
+        self.curr = self.peek;
+        self.peek = self.l.next();
     }
 
     pub fn parseModel(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
-        errdefer types.deinit(self.allocator);
-        while (self.curToken.?.type != TokenType.eof) : (self.advance()) {
-            switch (self.curToken.?.type) {
+        errdefer types.deinit(self.alloc);
+        while (self.curr.type != TokenType.eof) : (self.advance()) {
+            switch (self.curr.type) {
                 TokenType.kw_type => {
                     const type_decl = try self.parseType();
-                    try types.append(self.allocator, type_decl);
+                    try types.append(self.alloc, type_decl);
                 },
                 TokenType.illegal => {
                     return ParserError.IllegalCharacter;
@@ -70,33 +70,29 @@ pub const Parser = struct {
             }
         }
         return .{
-            .types = try types.toOwnedSlice(self.allocator),
+            .types = try types.toOwnedSlice(self.alloc),
         };
     }
 
     fn parseType(self: *Parser) !ast.Type {
-        var curToken = self.curToken orelse return ParserError.IllegalCharacter;
-        const start = curToken.start;
+        const start = self.curr.start;
         var end = start;
         self.advance();
-        curToken = self.curToken orelse return ParserError.IllegalCharacter;
-        if (curToken.type != TokenType.identifier) {
+        if (self.curr.type != TokenType.identifier) {
             return ParserError.UnexpectedToken;
         }
-        const nameStart = curToken.start;
-        const nameEnd = curToken.end;
-        const name = self.l.lexeme(curToken);
+        const nameStart = self.curr.start;
+        const nameEnd = self.curr.end;
+        const name = self.l.lexeme(self.curr);
         const s = try self.i.intern(name);
         self.advance();
-        curToken = self.curToken orelse return ParserError.IllegalCharacter;
-        if (curToken.type != TokenType.l_brace) {
+        if (self.curr.type != TokenType.l_brace) {
             return ParserError.UnexpectedToken;
         }
         while (true) : (self.advance()) {
-            curToken = self.curToken orelse return ParserError.IllegalCharacter;
-            switch (curToken.type) {
+            switch (self.curr.type) {
                 TokenType.r_brace => {
-                    end = curToken.end;
+                    end = self.curr.end;
                     break;
                 },
                 TokenType.illegal => {
@@ -128,11 +124,11 @@ pub const Parser = struct {
 };
 
 fn expectModel(source: []const u8, expected: ast.Model) !void {
-    const allocator = std.testing.allocator;
-    var parser = Parser.init(allocator, source);
+    const alloc = std.testing.allocator;
+    var parser = Parser.init(alloc, source);
     defer parser.deinit();
     var actual = try parser.parseModel();
-    defer actual.deinit(allocator);
+    defer actual.deinit(alloc);
     try testing.expectEqualDeep(expected, actual);
 }
 

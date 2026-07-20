@@ -62,18 +62,19 @@ pub const Parser = struct {
             }
             conditions.deinit(self.alloc);
         }
-        while (!self.currIs(TokenType.eof)) : (self.advance()) {
+        while (!self.currIs(.eof)) : (self.advance()) {
             switch (self.curr.type) {
-                TokenType.kw_type => {
+                .kw_type => {
                     const type_decl = try self.parseType();
+                    // TODO: deinit type_decl
                     try types.append(self.alloc, type_decl);
                 },
-                TokenType.kw_condition => {
+                .kw_condition => {
                     const condition = try self.parseCondition();
                     errdefer condition.deinit(self.alloc);
                     try conditions.append(self.alloc, condition);
                 },
-                TokenType.illegal => {
+                .illegal => {
                     return ParserError.IllegalCharacter;
                 },
                 else => {
@@ -81,175 +82,122 @@ pub const Parser = struct {
                 },
             }
         }
+
+        const owned_types = try types.toOwnedSlice(self.alloc);
+        errdefer self.alloc.free(owned_types);
+        const owned_conditions = try conditions.toOwnedSlice(self.alloc);
+        errdefer self.alloc.free(owned_conditions);
+
         return .{
-            .types = try types.toOwnedSlice(self.alloc),
-            .conditions = try conditions.toOwnedSlice(self.alloc),
+            .types = owned_types,
+            .conditions = owned_conditions,
         };
     }
 
     fn parseCondition(self: *Parser) !ast.Condition {
-        const start = self.curr.start;
-        var end = start;
-        self.advance();
-        try self.expectCurr(TokenType.identifier);
+        const cond = try self.consume(.kw_condition);
         const name = try self.parseIdentifier();
-        try self.expectCurr(TokenType.l_paren);
-        var params: []const ast.Parameter = &.{};
-        errdefer self.alloc.free(params);
-        self.advance();
-        while (!self.currIs(TokenType.r_paren)) : (self.advance()) {
-            switch (self.curr.type) {
-                TokenType.identifier => {
-                    params = try self.parseConditionParams();
-                },
-                TokenType.illegal => {
-                    return ParserError.IllegalCharacter;
-                },
-                TokenType.eof => {
-                    return ParserError.UnexpectedToken;
-                },
-                else => {
-                    return ParserError.UnexpectedToken;
-                },
-            }
-        }
-        try self.expectCurr(TokenType.r_paren);
-        self.advance();
-        try self.expectCurr(TokenType.l_brace);
-        self.advance();
-        while (!self.currIs(TokenType.r_brace)) : (self.advance()) {
-            switch (self.curr.type) {
-                TokenType.illegal => {
-                    return ParserError.IllegalCharacter;
-                },
-                TokenType.eof => {
-                    return ParserError.UnexpectedToken;
-                },
-                else => {
-                    // TODO: parse condition expressions
-                },
-            }
-        }
-        try self.expectCurr(TokenType.r_brace);
-        end = self.curr.end;
+        _ = try self.consume(.l_paren);
+
+        var params: ArrayList(ast.Parameter) = .empty;
+        errdefer params.deinit(self.alloc);
+        try self.parseConditionParams(&params);
+        _ = try self.consume(.r_paren);
+
+        const body = try self.skipOpaqueBody();
         return .{
             .name = name,
-            .params = params,
+            .params = try params.toOwnedSlice(self.alloc),
             .span = .{
-                .start = start,
-                .end = end,
+                .start = cond.start,
+                .end = body.end,
             },
         };
     }
 
-    fn parseConditionParams(self: *Parser) ![]const ast.Parameter {
-        var params: ArrayList(ast.Parameter) = .empty;
-        errdefer params.deinit(self.alloc);
+    fn parseConditionParams(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
+        if (self.currIs(.r_paren)) return;
+
         while (true) {
-            const name = try self.parseIdentifier();
-            try self.expectCurr(TokenType.colon);
-            self.advance(); // skip colon
-            const typeRef = try self.parseValueTypeRef();
-            try params.append(self.alloc, .{
-                .name = name,
-                .type = typeRef,
-                .span = .{
-                    .start = name.span.start,
-                    .end = typeRef.span.end,
-                },
-            });
-            if (self.peekIs(TokenType.comma)) { // skip comma
-                self.advance();
-                self.advance();
-            }
-            if (self.peekIs(TokenType.r_paren)) {
-                break;
+            const param = try self.parseConditionParam();
+            try params.append(self.alloc, param);
+            if (!self.match(.comma)) break;
+        }
+    }
+
+    fn parseConditionParam(self: *Parser) !ast.Parameter {
+        const name = try self.parseIdentifier();
+        _ = try self.consume(.colon);
+        const typeRef = try self.parseValueTypeRef();
+        return .{
+            .name = name,
+            .type = typeRef,
+            .span = .{
+                .start = name.span.start,
+                .end = typeRef.span.end,
+            },
+        };
+    }
+
+    fn skipOpaqueBody(self: *Parser) !ast.Span {
+        const opening = try self.consume(.l_brace);
+        while (!self.currIs(.r_brace)) {
+            switch (self.curr.type) {
+                .illegal => return ParserError.IllegalCharacter,
+                .eof => return ParserError.UnexpectedToken,
+                else => self.advance(),
             }
         }
+        const closing = try self.consume(.r_brace);
 
-        return try params.toOwnedSlice(self.alloc);
+        return .{
+            .start = opening.start,
+            .end = closing.end,
+        };
     }
 
     fn parseType(self: *Parser) !ast.Type {
-        const start = self.curr.start;
-        var end = start;
-        self.advance();
-        try self.expectCurr(TokenType.identifier);
+        const type_decl = try self.consume(.kw_type);
         const name = try self.parseIdentifier();
-        try self.expectCurr(TokenType.l_brace);
-        while (true) : (self.advance()) {
-            switch (self.curr.type) {
-                TokenType.r_brace => {
-                    end = self.curr.end;
-                    break;
-                },
-                TokenType.illegal => {
-                    return ParserError.IllegalCharacter;
-                },
-                TokenType.eof => {
-                    return ParserError.UnexpectedToken;
-                },
-                else => {
-                    // TODO: parse relations and permissions
-                },
-            }
-        }
+        const body = try self.skipOpaqueBody();
 
         return .{
             .name = name,
             .span = .{
-                .start = start,
-                .end = end,
+                .start = type_decl.start,
+                .end = body.end,
             },
         };
     }
 
     fn parseIdentifier(self: *Parser) !ast.Identifier {
-        try self.expectCurr(TokenType.identifier);
-        const start = self.curr.start;
-        const end = self.curr.end;
-        const name = self.currText();
-        const s = try self.intern(name);
-        self.advance();
+        const tok = try self.consume(.identifier);
+        const s = try self.intern(self.lexeme(tok));
         return .{
             .symbol = s,
             .span = .{
-                .start = start,
-                .end = end,
+                .start = tok.start,
+                .end = tok.end,
             },
         };
     }
 
     fn parseValueTypeRef(self: *Parser) !ast.ValueTypeRef {
-        try self.expectCurr(TokenType.identifier);
-        const start = self.curr.start;
-        const end = self.curr.end;
-        const name = self.currText();
-        const s = try self.intern(name);
+        const name = try self.parseIdentifier();
+        var end = name.span.end;
         var collection = false;
-        if (self.peekIs(TokenType.l_bracket)) {
+        if (self.match(.l_bracket)) {
+            const closing = try self.consume(.r_bracket);
+            end = closing.end;
             collection = true;
-            self.advance();
-        }
-        if (!collection and self.peekIs(TokenType.r_bracket)) {
+        } else if (self.match(.r_bracket)) {
             return ParserError.UnexpectedToken;
         }
-        if (collection) {
-            try self.expectPeek(TokenType.r_bracket);
-            self.advance();
-        }
-        const refEnd = self.curr.end;
         return .{
-            .name = .{
-                .symbol = s,
-                .span = .{
-                    .start = start,
-                    .end = end,
-                },
-            },
+            .name = name,
             .span = .{
-                .start = start,
-                .end = refEnd,
+                .start = name.span.start,
+                .end = end,
             },
             .collection = collection,
         };
@@ -280,8 +228,27 @@ pub const Parser = struct {
         return self.l.lexeme(self.curr);
     }
 
+    fn lexeme(self: *Parser, t: Token) []const u8 {
+        return self.l.lexeme(t);
+    }
+
     fn intern(self: *Parser, name: []const u8) !SymbolId {
         return self.i.intern(name);
+    }
+
+    fn consume(self: *Parser, expected: TokenType) !Token {
+        try self.expectCurr(expected);
+        const consumed = self.curr;
+        self.advance();
+        return consumed;
+    }
+
+    fn match(self: *Parser, expected: TokenType) bool {
+        if (!self.currIs(expected)) {
+            return false;
+        }
+        self.advance();
+        return true;
     }
 };
 

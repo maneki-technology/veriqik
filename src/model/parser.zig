@@ -228,10 +228,14 @@ pub const Parser = struct {
         const s = try self.intern(name);
         var collection = false;
         if (self.peekIs(TokenType.l_bracket)) {
+            collection = true;
             self.advance();
         }
-        if (self.peekIs(TokenType.r_bracket)) {
-            collection = true;
+        if (!collection and self.peekIs(TokenType.r_bracket)) {
+            return ParserError.UnexpectedToken;
+        }
+        if (collection) {
+            try self.expectPeek(TokenType.r_bracket);
             self.advance();
         }
         const refEnd = self.curr.end;
@@ -511,6 +515,20 @@ test "parse model with condition missing opening brace" {
 
 test "parse model with condition missing closing brace" {
     const source = "condition allow_ip(ip: IpAddress) {";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+}
+
+test "parse model with condition missing opening bracket" {
+    const source = "condition allow_ip(ip: IpAddress]) {}";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+}
+
+test "parse model with condition missing closing bracket" {
+    const source = "condition allow_ip(ip: IpAddress[) {}";
     var parser = Parser.init(std.testing.allocator, source);
     defer parser.deinit();
     try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());

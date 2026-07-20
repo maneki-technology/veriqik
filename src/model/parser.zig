@@ -266,6 +266,14 @@ fn expectSpanText(source: []const u8, span: ast.Span, expected: []const u8) !voi
     try testing.expectEqualStrings(expected, source[span.start..span.end]);
 }
 
+fn expectExactSpan(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
+    const start = std.mem.indexOf(u8, source, expected_text).?;
+    try testing.expectEqual(ast.Span{
+        .start = start,
+        .end = start + expected_text.len,
+    }, actual);
+}
+
 fn expectIdentifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
     try expectSpanText(source, actual.span, expected);
 }
@@ -407,6 +415,30 @@ test "parse model with multiple declarations" {
     try expectIdentifier(source, parsed.model.types[0].name, "User");
     try expectIdentifier(source, parsed.model.conditions[0].name, "allow");
     try expectIdentifier(source, parsed.model.types[1].name, "Group");
+}
+
+test "repeated identifiers share a symbol" {
+    const source = "condition allow(subject: User, owner: User) {}";
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    const params = parsed.model.conditions[0].params;
+    try testing.expectEqual(@as(usize, 2), params.len);
+    try testing.expectEqual(params[0].type.name.symbol, params[1].type.name.symbol);
+}
+
+test "declaration spans exclude surrounding source" {
+    const source =
+        \\  type User {}
+        \\  condition allow() {}
+        \\  type Group {}
+    ;
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try expectExactSpan(source, parsed.model.types[0].span, "type User {}");
+    try expectExactSpan(source, parsed.model.conditions[0].span, "condition allow() {}");
+    try expectExactSpan(source, parsed.model.types[1].span, "type Group {}");
 }
 
 test "parse model with condition with illegal character" {

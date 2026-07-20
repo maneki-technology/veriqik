@@ -55,11 +55,23 @@ pub const Parser = struct {
     pub fn parseModel(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
         errdefer types.deinit(self.alloc);
-        while (self.curr.type != TokenType.eof) : (self.advance()) {
+        var conditions: ArrayList(ast.Condition) = .empty;
+        errdefer {
+            for (conditions.items) |*cond| {
+                cond.deinit(self.alloc);
+            }
+            conditions.deinit(self.alloc);
+        }
+        while (!self.currIs(TokenType.eof)) : (self.advance()) {
             switch (self.curr.type) {
                 TokenType.kw_type => {
                     const type_decl = try self.parseType();
                     try types.append(self.alloc, type_decl);
+                },
+                TokenType.kw_condition => {
+                    const condition = try self.parseCondition();
+                    errdefer condition.deinit(self.alloc);
+                    try conditions.append(self.alloc, condition);
                 },
                 TokenType.illegal => {
                     return ParserError.IllegalCharacter;
@@ -71,24 +83,100 @@ pub const Parser = struct {
         }
         return .{
             .types = try types.toOwnedSlice(self.alloc),
+            .conditions = try conditions.toOwnedSlice(self.alloc),
         };
+    }
+
+    fn parseCondition(self: *Parser) !ast.Condition {
+        const start = self.curr.start;
+        var end = start;
+        self.advance();
+        try self.expectCurr(TokenType.identifier);
+        const name = try self.parseIdentifier();
+        try self.expectCurr(TokenType.l_paren);
+        var params: []const ast.Parameter = &.{};
+        errdefer self.alloc.free(params);
+        self.advance();
+        while (!self.currIs(TokenType.r_paren)) : (self.advance()) {
+            switch (self.curr.type) {
+                TokenType.identifier => {
+                    params = try self.parseConditionParams();
+                },
+                TokenType.illegal => {
+                    return ParserError.IllegalCharacter;
+                },
+                TokenType.eof => {
+                    return ParserError.UnexpectedToken;
+                },
+                else => {
+                    return ParserError.UnexpectedToken;
+                },
+            }
+        }
+        try self.expectCurr(TokenType.r_paren);
+        self.advance();
+        try self.expectCurr(TokenType.l_brace);
+        self.advance();
+        while (!self.currIs(TokenType.r_brace)) : (self.advance()) {
+            switch (self.curr.type) {
+                TokenType.illegal => {
+                    return ParserError.IllegalCharacter;
+                },
+                TokenType.eof => {
+                    return ParserError.UnexpectedToken;
+                },
+                else => {
+                    // TODO: parse condition expressions
+                },
+            }
+        }
+        try self.expectCurr(TokenType.r_brace);
+        end = self.curr.end;
+        return .{
+            .name = name,
+            .params = params,
+            .span = .{
+                .start = start,
+                .end = end,
+            },
+        };
+    }
+
+    fn parseConditionParams(self: *Parser) ![]const ast.Parameter {
+        var params: ArrayList(ast.Parameter) = .empty;
+        errdefer params.deinit(self.alloc);
+        while (true) {
+            const name = try self.parseIdentifier();
+            try self.expectCurr(TokenType.colon);
+            self.advance(); // skip colon
+            const typeRef = try self.parseValueTypeRef();
+            try params.append(self.alloc, .{
+                .name = name,
+                .type = typeRef,
+                .span = .{
+                    .start = name.span.start,
+                    .end = typeRef.span.end,
+                },
+            });
+            if (self.peekIs(TokenType.comma)) { // skip comma
+                self.advance();
+                self.advance();
+            }
+            if (self.peekIs(TokenType.r_paren)) {
+                break;
+            }
+        }
+
+        return try params.toOwnedSlice(self.alloc);
     }
 
     fn parseType(self: *Parser) !ast.Type {
         const start = self.curr.start;
         var end = start;
         self.advance();
-        if (self.curr.type != TokenType.identifier) {
-            return ParserError.UnexpectedToken;
-        }
-        const nameStart = self.curr.start;
-        const nameEnd = self.curr.end;
-        const name = self.l.lexeme(self.curr);
-        const s = try self.i.intern(name);
-        self.advance();
-        if (self.curr.type != TokenType.l_brace) {
-            return ParserError.UnexpectedToken;
-        }
+        try self.expectCurr(TokenType.identifier);
+        const name = try self.parseIdentifier();
+        try self.expectCurr(TokenType.l_brace);
         while (true) : (self.advance()) {
             switch (self.curr.type) {
                 TokenType.r_brace => {
@@ -108,18 +196,88 @@ pub const Parser = struct {
         }
 
         return .{
-            .name = .{
-                .symbol = s,
-                .span = .{
-                    .start = nameStart,
-                    .end = nameEnd,
-                },
-            },
+            .name = name,
             .span = .{
                 .start = start,
                 .end = end,
             },
         };
+    }
+
+    fn parseIdentifier(self: *Parser) !ast.Identifier {
+        try self.expectCurr(TokenType.identifier);
+        const start = self.curr.start;
+        const end = self.curr.end;
+        const name = self.currText();
+        const s = try self.intern(name);
+        self.advance();
+        return .{
+            .symbol = s,
+            .span = .{
+                .start = start,
+                .end = end,
+            },
+        };
+    }
+
+    fn parseValueTypeRef(self: *Parser) !ast.ValueTypeRef {
+        try self.expectCurr(TokenType.identifier);
+        const start = self.curr.start;
+        const end = self.curr.end;
+        const name = self.currText();
+        const s = try self.intern(name);
+        var collection = false;
+        if (self.peekIs(TokenType.l_bracket)) {
+            self.advance();
+        }
+        if (self.peekIs(TokenType.r_bracket)) {
+            collection = true;
+            self.advance();
+        }
+        const refEnd = self.curr.end;
+        return .{
+            .name = .{
+                .symbol = s,
+                .span = .{
+                    .start = start,
+                    .end = end,
+                },
+            },
+            .span = .{
+                .start = start,
+                .end = refEnd,
+            },
+            .collection = collection,
+        };
+    }
+
+    // HELPERS
+    fn currIs(self: *Parser, expected: TokenType) bool {
+        return self.curr.type == expected;
+    }
+
+    fn peekIs(self: *Parser, expected: TokenType) bool {
+        return self.peek.type == expected;
+    }
+
+    fn expectCurr(self: *Parser, expected: TokenType) !void {
+        if (!self.currIs(expected)) {
+            return ParserError.UnexpectedToken;
+        }
+    }
+
+    fn expectPeek(self: *Parser, expected: TokenType) !void {
+        if (!self.peekIs(expected)) {
+            return ParserError.UnexpectedToken;
+        }
+    }
+
+    fn currText(self: *Parser) []const u8 {
+        return self.l.lexeme(self.curr);
+    }
+
+    fn intern(self: *Parser, name: []const u8) !SymbolId {
+        return self.i.intern(name);
     }
 };
 
@@ -177,8 +335,182 @@ test "parse model with type with illegal character" {
     try testing.expectError(ParserError.IllegalCharacter, parser.parseModel());
 }
 
-test "parse model missing closing brace" {
+test "parse model with type missing closing brace" {
     const source = "type User { relation member[0..10]: User";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+}
+
+test "parse model with empty condition" {
+    const source = "condition allow() {}";
+    const expected = ast.Model{
+        .types = &.{},
+        .conditions = &[_]ast.Condition{
+            .{
+                .name = .{
+                    .symbol = SymbolId.fromInt(0),
+                    .span = .{ .start = 10, .end = 15 },
+                },
+                .params = &.{},
+                .span = .{ .start = 0, .end = source.len },
+            },
+        },
+    };
+
+    try expectModel(source, expected);
+}
+
+test "parse model with simple condition" {
+    const source = "condition allow_ip(ip: IpAddress) {}";
+    const expected = ast.Model{
+        .types = &.{},
+        .conditions = &[_]ast.Condition{
+            .{
+                .name = .{
+                    .symbol = SymbolId.fromInt(0),
+                    .span = .{ .start = 10, .end = 18 },
+                },
+                .params = &.{
+                    .{
+                        .name = .{
+                            .symbol = SymbolId.fromInt(1),
+                            .span = .{ .start = 19, .end = 21 },
+                        },
+                        .type = .{
+                            .name = .{
+                                .symbol = SymbolId.fromInt(2),
+                                .span = .{ .start = 23, .end = 32 },
+                            },
+                            .span = .{ .start = 23, .end = 32 },
+                            .collection = false,
+                        },
+                        .span = .{ .start = 19, .end = 32 },
+                    },
+                },
+                .span = .{ .start = 0, .end = source.len },
+            },
+        },
+    };
+
+    try expectModel(source, expected);
+}
+
+test "parse model with condition with array param" {
+    const source = "condition allow_ip(ip: IpAddress[]) {}";
+    const expected = ast.Model{
+        .types = &.{},
+        .conditions = &[_]ast.Condition{
+            .{
+                .name = .{
+                    .symbol = SymbolId.fromInt(0),
+                    .span = .{ .start = 10, .end = 18 },
+                },
+                .params = &.{
+                    .{
+                        .name = .{
+                            .symbol = SymbolId.fromInt(1),
+                            .span = .{ .start = 19, .end = 21 },
+                        },
+                        .type = .{
+                            .name = .{
+                                .symbol = SymbolId.fromInt(2),
+                                .span = .{ .start = 23, .end = 32 },
+                            },
+                            .span = .{ .start = 23, .end = 34 },
+                            .collection = true,
+                        },
+                        .span = .{ .start = 19, .end = 34 },
+                    },
+                },
+                .span = .{ .start = 0, .end = source.len },
+            },
+        },
+    };
+
+    try expectModel(source, expected);
+}
+
+test "parse model with condition with multiple params" {
+    const source = "condition allow_ip(ip: IpAddress, port: Port) {}";
+    const expected = ast.Model{
+        .types = &.{},
+        .conditions = &[_]ast.Condition{
+            .{
+                .name = .{
+                    .symbol = SymbolId.fromInt(0),
+                    .span = .{ .start = 10, .end = 18 },
+                },
+                .params = &.{
+                    .{
+                        .name = .{
+                            .symbol = SymbolId.fromInt(1),
+                            .span = .{ .start = 19, .end = 21 },
+                        },
+                        .type = .{
+                            .name = .{
+                                .symbol = SymbolId.fromInt(2),
+                                .span = .{ .start = 23, .end = 32 },
+                            },
+                            .span = .{ .start = 23, .end = 32 },
+                            .collection = false,
+                        },
+                        .span = .{ .start = 19, .end = 32 },
+                    },
+                    .{
+                        .name = .{
+                            .symbol = SymbolId.fromInt(3),
+                            .span = .{ .start = 34, .end = 38 },
+                        },
+                        .type = .{
+                            .name = .{
+                                .symbol = SymbolId.fromInt(4),
+                                .span = .{ .start = 40, .end = 44 },
+                            },
+                            .span = .{ .start = 40, .end = 44 },
+                            .collection = false,
+                        },
+                        .span = .{ .start = 34, .end = 44 },
+                    },
+                },
+                .span = .{ .start = 0, .end = source.len },
+            },
+        },
+    };
+
+    try expectModel(source, expected);
+}
+
+test "parse model with conditon with illegal character" {
+    const source = "condition allow_ip(ip: IpAddress) { @ }";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.IllegalCharacter, parser.parseModel());
+}
+
+test "parse model with condition missing opening paren" {
+    const source = "condition allow_ip ip: IpAddress {}";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+}
+
+test "parse model with condition missing closing paren" {
+    const source = "condition allow_ip(ip: IpAddress {}";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+}
+
+test "parse model with condition missing opening brace" {
+    const source = "condition allow_ip(ip: IpAddress)";
+    var parser = Parser.init(std.testing.allocator, source);
+    defer parser.deinit();
+    try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());
+}
+
+test "parse model with condition missing closing brace" {
+    const source = "condition allow_ip(ip: IpAddress) {";
     var parser = Parser.init(std.testing.allocator, source);
     defer parser.deinit();
     try testing.expectError(ParserError.UnexpectedToken, parser.parseModel());

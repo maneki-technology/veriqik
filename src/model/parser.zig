@@ -221,9 +221,6 @@ pub const Parser = struct {
                 .illegal => return ParserError.IllegalCharacter,
                 else => return ParserError.UnexpectedToken,
             }
-            if (self.match(.integer)) {
-                cardinality.?.min = try self.parseInteger();
-            }
         } else if (self.match(.r_bracket)) {
             return ParserError.UnexpectedToken;
         }

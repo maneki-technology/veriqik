@@ -11,13 +11,28 @@ pub const Identifier = struct {
     span: Span,
 };
 
-pub const Relation = struct {};
+pub const Cardinality = struct {
+    min: usize = 0,
+    max: ?usize,
+};
+
+pub const Relation = struct {
+    name: Identifier,
+    cardinality: ?Cardinality,
+    // TODO: relation expression
+    span: Span,
+};
 
 pub const Permission = struct {};
 
 pub const Type = struct {
     name: Identifier,
+    relations: []const Relation = &.{},
     span: Span,
+
+    pub fn deinit(self: *const Type, allocator: std.mem.Allocator) void {
+        allocator.free(self.relations);
+    }
 };
 
 pub const ValueTypeRef = struct {
@@ -47,6 +62,9 @@ pub const Model = struct {
     conditions: []const Condition = &.{},
 
     pub fn deinit(self: *Model, allocator: std.mem.Allocator) void {
+        for (self.types) |*type_decl| {
+            type_decl.deinit(allocator);
+        }
         allocator.free(self.types);
         for (self.conditions) |*cond| {
             cond.deinit(allocator);

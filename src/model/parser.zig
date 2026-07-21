@@ -17,7 +17,8 @@ const Interner = symbol.Interner;
 const ParserError = error{
     IllegalCharacter,
     UnexpectedToken,
-} || std.mem.Allocator.Error;
+    ReservedKeyword,
+};
 
 pub const Parser = struct {
     alloc: std.mem.Allocator,
@@ -66,7 +67,7 @@ pub const Parser = struct {
             switch (self.curr.type) {
                 .kw_type => {
                     const type_decl = try self.parseType();
-                    // TODO: deinit type_decl
+                    errdefer type_decl.deinit(self.alloc);
                     try types.append(self.alloc, type_decl);
                 },
                 .kw_condition => {
@@ -84,7 +85,12 @@ pub const Parser = struct {
         }
 
         const owned_types = try types.toOwnedSlice(self.alloc);
-        errdefer self.alloc.free(owned_types);
+        errdefer {
+            for (owned_types) |*owned_type| {
+                owned_type.deinit(self.alloc);
+            }
+            self.alloc.free(owned_types);
+        }
         const owned_conditions = try conditions.toOwnedSlice(self.alloc);
         errdefer self.alloc.free(owned_conditions);
 
@@ -139,35 +145,110 @@ pub const Parser = struct {
         };
     }
 
-    fn skipOpaqueBody(self: *Parser) !ast.Span {
+    fn parseType(self: *Parser) !ast.Type {
+        const type_decl = try self.consume(.kw_type);
+        const name = try self.parseIdentifier();
+        var bodySpan: ast.Span = undefined;
+        var relations: ArrayList(ast.Relation) = .empty;
+        errdefer relations.deinit(self.alloc);
+        try self.parseBody(&bodySpan, &relations);
+
+        const owned_relations = try relations.toOwnedSlice(self.alloc);
+        errdefer self.alloc.free(owned_relations);
+
+        return .{
+            .name = name,
+            .relations = owned_relations,
+            .span = .{
+                .start = type_decl.start,
+                .end = bodySpan.end,
+            },
+        };
+    }
+
+    fn parseBody(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
         const opening = try self.consume(.l_brace);
         while (!self.currIs(.r_brace)) {
             switch (self.curr.type) {
+                .kw_relation => try self.parseRelation(relations),
+                .kw_permission => try self.parsePermission(),
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
-                else => self.advance(),
+                else => return ParserError.UnexpectedToken,
             }
         }
         const closing = try self.consume(.r_brace);
-
-        return .{
+        span.* = .{
             .start = opening.start,
             .end = closing.end,
         };
     }
 
-    fn parseType(self: *Parser) !ast.Type {
-        const type_decl = try self.consume(.kw_type);
+    fn parseRelation(self: *Parser, relations: *ArrayList(ast.Relation)) !void {
+        const relation_decl = try self.consume(.kw_relation);
         const name = try self.parseIdentifier();
-        const body = try self.skipOpaqueBody();
-
-        return .{
+        var cardinality: ?ast.Cardinality = null;
+        if (self.match(.l_bracket)) {
+            cardinality = .{ .max = null };
+            while (!self.match(.r_bracket)) {
+                switch (self.curr.type) {
+                    .range => {
+                        _ = try self.consume(.range);
+                        if (self.currIs(.integer)) {
+                            cardinality.?.max = try self.parseInteger();
+                        }
+                    },
+                    .integer => {
+                        cardinality.?.min = try self.parseInteger();
+                        _ = try self.consume(.range);
+                        if (self.currIs(.integer)) {
+                            cardinality.?.max = try self.parseInteger();
+                        }
+                    },
+                    else => return ParserError.UnexpectedToken,
+                }
+            }
+            if (self.match(.integer)) {
+                cardinality.?.min = try self.parseInteger();
+            }
+        } else if (self.match(.r_bracket)) {
+            return ParserError.UnexpectedToken;
+        }
+        _ = try self.consume(.colon);
+        var exprSpan: ast.Span = undefined;
+        self.skipRelationExpression(&exprSpan);
+        try relations.append(self.alloc, .{
             .name = name,
+            .cardinality = cardinality,
             .span = .{
-                .start = type_decl.start,
-                .end = body.end,
+                .start = relation_decl.start,
+                .end = exprSpan.end,
             },
+        });
+    }
+
+    fn skipRelationExpression(self: *Parser, span: *ast.Span) void {
+        const start = self.curr.start;
+        while (true) {
+            switch (self.peek.type) {
+                .kw_relation, .kw_permission, .r_brace, .eof => break,
+                else => self.advance(),
+            }
+        }
+        span.* = .{
+            .start = start,
+            .end = self.curr.end,
         };
+        self.advance();
+    }
+
+    fn parseInteger(self: *Parser) !usize {
+        const tok = try self.consume(.integer);
+        return std.fmt.parseUnsigned(usize, self.lexeme(tok), 10) catch ParserError.IllegalCharacter;
+    }
+
+    fn parsePermission(_: *Parser) !void {
+        return ParserError.ReservedKeyword;
     }
 
     fn parseIdentifier(self: *Parser) !ast.Identifier {
@@ -203,25 +284,24 @@ pub const Parser = struct {
         };
     }
 
-    // HELPERS
-    fn currIs(self: *Parser, expected: TokenType) bool {
-        return self.curr.type == expected;
-    }
-
-    fn expectCurr(self: *Parser, expected: TokenType) !void {
-        if (!self.currIs(expected)) {
-            return ParserError.UnexpectedToken;
+    fn skipOpaqueBody(self: *Parser) !ast.Span {
+        const opening = try self.consume(.l_brace);
+        while (!self.currIs(.r_brace)) {
+            switch (self.curr.type) {
+                .illegal => return ParserError.IllegalCharacter,
+                .eof => return ParserError.UnexpectedToken,
+                else => self.advance(),
+            }
         }
+        const closing = try self.consume(.r_brace);
+
+        return .{
+            .start = opening.start,
+            .end = closing.end,
+        };
     }
 
-    fn lexeme(self: *Parser, t: Token) []const u8 {
-        return self.l.lexeme(t);
-    }
-
-    fn intern(self: *Parser, name: []const u8) !SymbolId {
-        return self.i.intern(name);
-    }
-
+    // HELPERS
     fn consume(self: *Parser, expected: TokenType) !Token {
         try self.expectCurr(expected);
         const consumed = self.curr;
@@ -235,6 +315,28 @@ pub const Parser = struct {
         }
         self.advance();
         return true;
+    }
+
+    fn currIs(self: *Parser, expected: TokenType) bool {
+        return self.curr.type == expected;
+    }
+
+    fn expectCurr(self: *Parser, expected: TokenType) !void {
+        if (!self.currIs(expected)) {
+            return ParserError.UnexpectedToken;
+        }
+    }
+
+    fn peekIs(self: *Parser, expected: TokenType) bool {
+        return self.peek.type == expected;
+    }
+
+    fn lexeme(self: *Parser, t: Token) []const u8 {
+        return self.l.lexeme(t);
+    }
+
+    fn intern(self: *Parser, name: []const u8) !SymbolId {
+        return self.i.intern(name);
     }
 };
 
@@ -276,6 +378,18 @@ fn expectExactSpan(source: []const u8, actual: ast.Span, expected_text: []const 
 
 fn expectIdentifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
     try expectSpanText(source, actual.span, expected);
+}
+
+fn expectRelation(
+    source: []const u8,
+    actual: ast.Relation,
+    expected: struct {
+        name: []const u8,
+        cardinality: ?ast.Cardinality,
+    },
+) !void {
+    try expectIdentifier(source, actual.name, expected.name);
+    try testing.expectEqual(expected.cardinality, actual.cardinality);
 }
 
 fn expectParameter(
@@ -328,6 +442,10 @@ test "parse model with type with body" {
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
     try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expectRelation(source, parsed.model.types[0].relations[0], .{
+        .name = "member",
+        .cardinality = .{ .min = 0, .max = 10 },
+    });
     try expectSpanText(source, parsed.model.types[0].span, source);
 }
 
@@ -487,5 +605,125 @@ test "parse model with condition missing closing bracket" {
     try expectParseError(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress[) {}",
+    );
+}
+
+test "parse model with a type with multiple relations" {
+    const source =
+        \\type Group {
+        \\  relation member[0..10]: User
+        \\  relation owner: User
+        \\}
+    ;
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try testing.expectEqual(@as(usize, 2), parsed.model.types[0].relations.len);
+    try expectRelation(source, parsed.model.types[0].relations[0], .{
+        .name = "member",
+        .cardinality = .{ .min = 0, .max = 10 },
+    });
+    try expectRelation(source, parsed.model.types[0].relations[1], .{
+        .name = "owner",
+        .cardinality = null,
+    });
+}
+
+test "parse model with a type with relation without upper bound" {
+    const source =
+        \\type Group {
+        \\  relation member[1..]: User
+        \\}
+    ;
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try testing.expectEqual(@as(usize, 1), parsed.model.types[0].relations.len);
+    try expectRelation(source, parsed.model.types[0].relations[0], .{
+        .name = "member",
+        .cardinality = .{ .min = 1, .max = null },
+    });
+}
+
+test "parse model with a type with relation without lower bound" {
+    const source =
+        \\type Group {
+        \\  relation member[..10]: User
+        \\}
+    ;
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try testing.expectEqual(@as(usize, 1), parsed.model.types[0].relations.len);
+    try expectRelation(source, parsed.model.types[0].relations[0], .{
+        .name = "member",
+        .cardinality = .{ .min = 0, .max = 10 },
+    });
+}
+
+test "parse a simple model with valid relations" {
+    const source =
+        \\type User {}
+        \\
+        \\type Group {
+        \\  relation owner: User
+        \\  relation member[..10]: User
+        \\}
+    ;
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try testing.expectEqual(@as(usize, 2), parsed.model.types.len);
+    try expectIdentifier(source, parsed.model.types[0].name, "User");
+    try expectIdentifier(source, parsed.model.types[1].name, "Group");
+    try testing.expectEqual(@as(usize, 2), parsed.model.types[1].relations.len);
+    try expectRelation(source, parsed.model.types[1].relations[0], .{
+        .name = "owner",
+        .cardinality = null,
+    });
+    try expectRelation(source, parsed.model.types[1].relations[1], .{
+        .name = "member",
+        .cardinality = .{ .min = 0, .max = 10 },
+    });
+}
+
+test "parse model with a type missing opening brace" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User }",
+    );
+}
+
+test "parse model with a type with a relation with missing closing bracket" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User { relation member[0..10: User }",
+    );
+}
+
+test "parse model with a type with a relation with missing opening bracket" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User { relation member 0..10]: User }",
+    );
+}
+
+test "parse model with a type with a relation with missing range token" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User { relation member [ 10]: User }",
+    );
+}
+
+test "parse model with a type with a relation with missing colon" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User { relation member[0..10] User }",
     );
 }

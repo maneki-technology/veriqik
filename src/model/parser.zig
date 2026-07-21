@@ -223,7 +223,7 @@ pub const Parser = struct {
         }
         _ = try self.consume(.colon);
         var exprSpan: ast.Span = undefined;
-        self.skipRelationExpression(&exprSpan);
+        try self.skipRelationExpression(&exprSpan);
         try relations.append(self.alloc, .{
             .name = name,
             .cardinality = cardinality,
@@ -234,19 +234,31 @@ pub const Parser = struct {
         });
     }
 
-    fn skipRelationExpression(self: *Parser, span: *ast.Span) void {
+    fn skipRelationExpression(self: *Parser, span: *ast.Span) !void {
+        // Empty expression
+        if (self.currIs(.kw_relation) or
+            self.currIs(.kw_permission) or
+            self.currIs(.r_brace) or
+            self.currIs(.eof))
+        {
+            return ParserError.UnexpectedToken;
+        }
+
         const start = self.curr.start;
+        var end = self.curr.end;
         while (true) {
-            switch (self.peek.type) {
+            switch (self.curr.type) {
                 .kw_relation, .kw_permission, .r_brace, .eof => break,
-                else => self.advance(),
+                else => {
+                    end = self.curr.end;
+                    self.advance();
+                },
             }
         }
         span.* = .{
             .start = start,
-            .end = self.curr.end,
+            .end = end,
         };
-        self.advance();
     }
 
     fn parseInteger(self: *Parser) !usize {
@@ -332,10 +344,6 @@ pub const Parser = struct {
         if (!self.currIs(expected)) {
             return ParserError.UnexpectedToken;
         }
-    }
-
-    fn peekIs(self: *Parser, expected: TokenType) bool {
-        return self.peek.type == expected;
     }
 
     fn lexeme(self: *Parser, t: Token) []const u8 {
@@ -753,5 +761,12 @@ test "parse model with a relation with repeated range" {
     try expectParseError(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10..20]: User }",
+    );
+}
+
+test "parse model with a relation with empty expression" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type Group { relation member: }",
     );
 }

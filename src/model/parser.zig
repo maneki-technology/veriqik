@@ -218,6 +218,7 @@ pub const Parser = struct {
                     }
                     _ = try self.consume(.r_bracket);
                 },
+                .illegal => return ParserError.IllegalCharacter,
                 else => return ParserError.UnexpectedToken,
             }
             if (self.match(.integer)) {
@@ -785,9 +786,23 @@ test "parse model with a relation with empty expression" {
     );
 }
 
-test "parse model with a relation with illegal character" {
+test "parse model with a relation with illegal character in expression" {
     try expectParseError(
         ParserError.IllegalCharacter,
         "type Group { relation member: @ }",
+    );
+}
+
+test "parse model with a relation with illegal character in declaration" {
+    try expectParseError(
+        ParserError.IllegalCharacter,
+        "type Group { relation member@: User }",
+    );
+}
+
+test "parse model with a relation with illegal character in cardinality" {
+    try expectParseError(
+        ParserError.IllegalCharacter,
+        "type Group { relation member[0..10@]: User }",
     );
 }

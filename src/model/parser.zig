@@ -55,7 +55,13 @@ pub const Parser = struct {
 
     pub fn parseModel(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
-        errdefer types.deinit(self.alloc);
+        errdefer {
+            for (types.items) |*type_decl| {
+                type_decl.deinit(self.alloc);
+            }
+            types.deinit(self.alloc);
+        }
+
         var conditions: ArrayList(ast.Condition) = .empty;
         errdefer {
             for (conditions.items) |*cond| {
@@ -63,6 +69,7 @@ pub const Parser = struct {
             }
             conditions.deinit(self.alloc);
         }
+
         while (!self.currIs(.eof)) {
             switch (self.curr.type) {
                 .kw_type => {
@@ -190,23 +197,23 @@ pub const Parser = struct {
         var cardinality: ?ast.Cardinality = null;
         if (self.match(.l_bracket)) {
             cardinality = .{ .max = null };
-            while (!self.match(.r_bracket)) {
-                switch (self.curr.type) {
-                    .range => {
-                        _ = try self.consume(.range);
-                        if (self.currIs(.integer)) {
-                            cardinality.?.max = try self.parseInteger();
-                        }
-                    },
-                    .integer => {
-                        cardinality.?.min = try self.parseInteger();
-                        _ = try self.consume(.range);
-                        if (self.currIs(.integer)) {
-                            cardinality.?.max = try self.parseInteger();
-                        }
-                    },
-                    else => return ParserError.UnexpectedToken,
-                }
+            switch (self.curr.type) {
+                .range => {
+                    _ = try self.consume(.range);
+                    if (self.currIs(.integer)) {
+                        cardinality.?.max = try self.parseInteger();
+                    }
+                    _ = try self.consume(.r_bracket);
+                },
+                .integer => {
+                    cardinality.?.min = try self.parseInteger();
+                    _ = try self.consume(.range);
+                    if (self.currIs(.integer)) {
+                        cardinality.?.max = try self.parseInteger();
+                    }
+                    _ = try self.consume(.r_bracket);
+                },
+                else => return ParserError.UnexpectedToken,
             }
             if (self.match(.integer)) {
                 cardinality.?.min = try self.parseInteger();
@@ -608,6 +615,13 @@ test "parse model with condition missing closing bracket" {
     );
 }
 
+test "parse model with mixed valid and invalid conditions" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "condition allow_ip(ip: IpAddress) {} condition allow() {",
+    );
+}
+
 test "parse model with a type with multiple relations" {
     const source =
         \\type Group {
@@ -725,5 +739,19 @@ test "parse model with a type with a relation with missing colon" {
     try expectParseError(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10] User }",
+    );
+}
+
+test "parse model with mixed valid and invalid types" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User {} type Group {",
+    );
+}
+
+test "parse model with a relation with repeated range" {
+    try expectParseError(
+        ParserError.UnexpectedToken,
+        "type User { relation member[0..10..20]: User }",
     );
 }

@@ -99,7 +99,12 @@ pub const Parser = struct {
             self.alloc.free(owned_types);
         }
         const owned_conditions = try conditions.toOwnedSlice(self.alloc);
-        errdefer self.alloc.free(owned_conditions);
+        errdefer {
+            for (owned_conditions) |*owned_condition| {
+                owned_condition.deinit(self.alloc);
+            }
+            self.alloc.free(owned_conditions);
+        }
 
         return .{
             .types = owned_types,
@@ -249,6 +254,7 @@ pub const Parser = struct {
         while (true) {
             switch (self.curr.type) {
                 .kw_relation, .kw_permission, .r_brace, .eof => break,
+                .illegal => return ParserError.IllegalCharacter,
                 else => {
                     end = self.curr.end;
                     self.advance();
@@ -432,7 +438,12 @@ fn expectParameter(
 fn expectParseError(expected: anyerror, source: []const u8) !void {
     var parser = Parser.init(testing.allocator, source);
     defer parser.deinit();
-    try testing.expectError(expected, parser.parseModel());
+    var model = parser.parseModel() catch |err| {
+        try testing.expectEqual(expected, err);
+        return;
+    };
+    defer model.deinit(testing.allocator);
+    return error.TestUnexpectedResult;
 }
 
 test "parse model with simple type" {
@@ -768,5 +779,12 @@ test "parse model with a relation with empty expression" {
     try expectParseError(
         ParserError.UnexpectedToken,
         "type Group { relation member: }",
+    );
+}
+
+test "parse model with a relation with illegal character" {
+    try expectParseError(
+        ParserError.IllegalCharacter,
+        "type Group { relation member: @ }",
     );
 }

@@ -347,6 +347,9 @@ pub const Parser = struct {
     }
 
     fn expectCurr(self: *Parser, expected: TokenType) !void {
+        if (self.currIs(.illegal)) {
+            return ParserError.IllegalCharacter;
+        }
         if (!self.currIs(expected)) {
             return ParserError.UnexpectedToken;
         }

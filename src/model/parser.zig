@@ -402,8 +402,12 @@ const TestModel = struct {
     model: ast.Model,
 
     fn parse(source: []const u8) !TestModel {
+        return parse_with_limits(source, .{});
+    }
+
+    fn parse_with_limits(source: []const u8, limits: Limits) !TestModel {
         const allocator = testing.allocator;
-        var parser = try Parser.init(allocator, source, .{});
+        var parser = try Parser.init(allocator, source, limits);
         errdefer parser.deinit();
 
         const model = try parser.parse_model();
@@ -472,7 +476,18 @@ fn expect_parameter(
 }
 
 fn expect_parse_error(expected: anyerror, source: []const u8) !void {
-    var parser = try Parser.init(testing.allocator, source, .{});
+    return expect_parse_error_with_limits(expected, source, .{});
+}
+
+fn expect_parse_error_with_limits(
+    expected: anyerror,
+    source: []const u8,
+    limits: Limits,
+) !void {
+    var parser = Parser.init(testing.allocator, source, limits) catch |err| {
+        try testing.expectEqual(expected, err);
+        return;
+    };
     defer parser.deinit();
     var model = parser.parse_model() catch |err| {
         try testing.expectEqual(expected, err);
@@ -480,6 +495,98 @@ fn expect_parse_error(expected: anyerror, source: []const u8) !void {
     };
     defer model.deinit(testing.allocator);
     return error.TestUnexpectedResult;
+}
+
+test "source byte limit" {
+    const source = "type User {}";
+    var parsed = try TestModel.parse_with_limits(source, .{
+        .source_bytes_max = source.len,
+    });
+    defer parsed.deinit();
+
+    try expect_parse_error_with_limits(ParserError.SourceTooLarge, source, .{
+        .source_bytes_max = source.len - 1,
+    });
+}
+
+test "type count limit" {
+    const limits = Limits{ .types_max = 1 };
+    var parsed = try TestModel.parse_with_limits("type User {}", limits);
+    defer parsed.deinit();
+
+    try expect_parse_error_with_limits(
+        ParserError.TooManyTypes,
+        "type User {} type Group {}",
+        limits,
+    );
+}
+
+test "condition count limit" {
+    const limits = Limits{ .conditions_max = 1 };
+    var parsed = try TestModel.parse_with_limits("condition allow() {}", limits);
+    defer parsed.deinit();
+
+    try expect_parse_error_with_limits(
+        ParserError.TooManyConditions,
+        "condition allow() {} condition deny() {}",
+        limits,
+    );
+}
+
+test "relation count limit" {
+    const limits = Limits{ .relations_per_type_max = 1 };
+    var parsed = try TestModel.parse_with_limits(
+        "type Group { relation member: User }",
+        limits,
+    );
+    defer parsed.deinit();
+
+    try expect_parse_error_with_limits(
+        ParserError.TooManyRelations,
+        "type Group { relation member: User relation owner: User }",
+        limits,
+    );
+}
+
+test "condition parameter count limit" {
+    const limits = Limits{ .parameters_per_condition_max = 1 };
+    var parsed = try TestModel.parse_with_limits(
+        "condition allow(subject: User) {}",
+        limits,
+    );
+    defer parsed.deinit();
+
+    try expect_parse_error_with_limits(
+        ParserError.TooManyParameters,
+        "condition allow(subject: User, owner: User) {}",
+        limits,
+    );
+}
+
+test "identifier byte limit" {
+    const limits = Limits{ .identifier_bytes_max = 4 };
+    var parsed = try TestModel.parse_with_limits("type User {}", limits);
+    defer parsed.deinit();
+
+    try expect_parse_error_with_limits(
+        error.IdentifierTooLong,
+        "type Users {}",
+        limits,
+    );
+}
+
+test "syntax errors take precedence over type count limit" {
+    const limits = Limits{ .types_max = 0 };
+    try expect_parse_error_with_limits(
+        ParserError.UnexpectedToken,
+        "type User {",
+        limits,
+    );
+    try expect_parse_error_with_limits(
+        ParserError.TooManyTypes,
+        "type User {}",
+        limits,
+    );
 }
 
 test "parse model with simple type" {

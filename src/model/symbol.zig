@@ -105,3 +105,11 @@ test "interner max symbols" {
     }
     try testing.expectError(InternerError.TooManySymbols, interner.intern("foo"));
 }
+
+test "interner max identifier bytes" {
+    var interner = Interner.init(testing.allocator, 8, 3);
+    defer interner.deinit();
+
+    try testing.expectEqual(SymbolId.from_int(0), try interner.intern("foo"));
+    try testing.expectError(InternerError.IdentifierTooLong, interner.intern("fooo"));
+}

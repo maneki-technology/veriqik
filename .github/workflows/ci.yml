@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  format:
-    name: Format
+  style:
+    name: Style
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -27,8 +27,8 @@ jobs:
       - name: Install Zig
         uses: mlugg/setup-zig@v2.2.1
 
-      - name: Check formatting
-        run: zig fmt --check build.zig build.zig.zon src
+      - name: Check style
+        run: zig build style --summary all
 
   test:
     name: Test

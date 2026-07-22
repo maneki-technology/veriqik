@@ -268,7 +268,11 @@ pub const Parser = struct {
 
     fn parse_integer(self: *Parser) !usize {
         const token = try self.consume(.integer);
-        return std.fmt.parseUnsigned(usize, self.lexeme(token), 10) catch ParserError.IllegalCharacter;
+        return std.fmt.parseUnsigned(
+            usize,
+            self.lexeme(token),
+            10,
+        ) catch ParserError.IllegalCharacter;
     }
 
     fn parse_permission(_: *Parser) !void {

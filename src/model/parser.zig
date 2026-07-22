@@ -90,24 +90,24 @@ pub const Parser = struct {
             }
         }
 
-        const owned_types = try types.toOwnedSlice(self.allocator);
+        const types_owned = try types.toOwnedSlice(self.allocator);
         errdefer {
-            for (owned_types) |*owned_type| {
-                owned_type.deinit(self.allocator);
+            for (types_owned) |*type_owned| {
+                type_owned.deinit(self.allocator);
             }
-            self.allocator.free(owned_types);
+            self.allocator.free(types_owned);
         }
-        const owned_conditions = try conditions.toOwnedSlice(self.allocator);
+        const conditions_owned = try conditions.toOwnedSlice(self.allocator);
         errdefer {
-            for (owned_conditions) |*owned_condition| {
-                owned_condition.deinit(self.allocator);
+            for (conditions_owned) |*condition_owned| {
+                condition_owned.deinit(self.allocator);
             }
-            self.allocator.free(owned_conditions);
+            self.allocator.free(conditions_owned);
         }
 
         return .{
-            .types = owned_types,
-            .conditions = owned_conditions,
+            .types = types_owned,
+            .conditions = conditions_owned,
         };
     }
 
@@ -122,9 +122,11 @@ pub const Parser = struct {
         _ = try self.consume(.r_paren);
 
         const body = try self.skip_opaque_body();
+        const parameters_owned = try parameters.toOwnedSlice(self.allocator);
+        errdefer self.allocator.free(parameters_owned);
         return .{
             .name = name,
-            .parameters = try parameters.toOwnedSlice(self.allocator),
+            .parameters = parameters_owned,
             .span = .{
                 .start = condition.start,
                 .end = body.end,
@@ -164,12 +166,12 @@ pub const Parser = struct {
         errdefer relations.deinit(self.allocator);
         try self.parse_type_body(&body_span, &relations);
 
-        const owned_relations = try relations.toOwnedSlice(self.allocator);
-        errdefer self.allocator.free(owned_relations);
+        const relations_owned = try relations.toOwnedSlice(self.allocator);
+        errdefer self.allocator.free(relations_owned);
 
         return .{
             .name = name,
-            .relations = owned_relations,
+            .relations = relations_owned,
             .span = .{
                 .start = type_decl.start,
                 .end = body_span.end,

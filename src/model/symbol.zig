@@ -49,14 +49,14 @@ pub const Interner = struct {
                 return InternerError.TooManySymbols;
             }
 
-            const duped_name = try self.allocator.dupe(u8, name);
-            errdefer self.allocator.free(duped_name);
+            const name_owned = try self.allocator.dupe(u8, name);
+            errdefer self.allocator.free(name_owned);
 
-            try self.name_by_id.append(self.allocator, duped_name);
+            try self.name_by_id.append(self.allocator, name_owned);
             errdefer _ = self.name_by_id.pop();
 
             const symbol_id = SymbolId.from_int(@as(u16, @intCast(id)));
-            try self.id_by_name.put(self.allocator, duped_name, symbol_id);
+            try self.id_by_name.put(self.allocator, name_owned, symbol_id);
 
             return symbol_id;
         };

@@ -237,10 +237,10 @@ pub const Lexer = struct {
 
     // This assumes that the token is from the same source created by this lexer.
     // Currently we don't have a way to enforce this.
-    pub fn lexeme(self: *Lexer, t: Token) []const u8 {
-        std.debug.assert(t.start <= t.end);
-        std.debug.assert(t.end <= self.input.len);
-        return self.input[t.start..t.end];
+    pub fn lexeme(self: *Lexer, token: Token) []const u8 {
+        std.debug.assert(token.start <= token.end);
+        std.debug.assert(token.end <= self.input.len);
+        return self.input[token.start..token.end];
     }
 
     pub fn next(self: *Lexer) Token {

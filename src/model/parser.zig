@@ -132,12 +132,12 @@ pub const Parser = struct {
         };
     }
 
-    fn parse_condition_parameters(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
+    fn parse_condition_parameters(self: *Parser, parameters: *ArrayList(ast.Parameter)) !void {
         if (self.current_token_is(.r_paren)) return;
 
         while (true) {
-            const param = try self.parse_condition_parameter();
-            try params.append(self.allocator, param);
+            const parameter = try self.parse_condition_parameter();
+            try parameters.append(self.allocator, parameter);
             if (!self.match(.comma)) break;
         }
     }
@@ -352,8 +352,8 @@ pub const Parser = struct {
         }
     }
 
-    fn lexeme(self: *Parser, t: Token) []const u8 {
-        return self.lexer.lexeme(t);
+    fn lexeme(self: *Parser, token: Token) []const u8 {
+        return self.lexer.lexeme(token);
     }
 
     fn intern(self: *Parser, name: []const u8) !SymbolId {

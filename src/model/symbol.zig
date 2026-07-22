@@ -23,14 +23,14 @@ pub const Interner = struct {
     allocator: std.mem.Allocator,
     name_by_id: ArrayList,
     id_by_name: Map,
-    limit: usize,
+    symbol_id_max: usize,
 
-    pub fn init(allocator: std.mem.Allocator, limit: usize) Interner {
+    pub fn init(allocator: std.mem.Allocator, symbol_id_max: usize) Interner {
         return .{
             .allocator = allocator,
             .name_by_id = .empty,
             .id_by_name = .empty,
-            .limit = limit,
+            .symbol_id_max = symbol_id_max,
         };
     }
 
@@ -45,7 +45,7 @@ pub const Interner = struct {
     pub fn intern(self: *Interner, name: []const u8) !SymbolId {
         const interned = self.id_by_name.get(name) orelse {
             const id = self.name_by_id.items.len;
-            if (id > self.limit) {
+            if (id > self.symbol_id_max) {
                 return InternerError.TooManySymbols;
             }
 

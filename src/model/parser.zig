@@ -33,14 +33,13 @@ pub const Parser = struct {
         const interner = Interner.init(allocator, std.math.maxInt(u16));
         const current_token = lexer.next();
         const peek_token = lexer.next();
-        const parser = Parser{
+        return .{
             .allocator = allocator,
             .lexer = lexer,
             .interner = interner,
             .current_token = current_token,
             .peek_token = peek_token,
         };
-        return parser;
     }
 
     pub fn deinit(self: *Parser) void {

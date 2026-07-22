@@ -14,7 +14,15 @@ const symbol_module = @import("symbol.zig");
 const SymbolId = symbol_module.SymbolId;
 const Interner = symbol_module.Interner;
 
+const limits_module = @import("limits.zig");
+const Limits = limits_module.Limits;
+
 const ParserError = error{
+    SourceTooLarge,
+    TooManyTypes,
+    TooManyConditions,
+    TooManyRelations,
+    TooManyParameters,
     IllegalCharacter,
     UnexpectedToken,
     ReservedKeyword,
@@ -27,11 +35,19 @@ pub const Parser = struct {
     interner: Interner,
     token_current: Token,
     token_peek: Token,
+    limits: Limits,
     // TODO: diagnostic/error state
 
-    pub fn init(allocator: std.mem.Allocator, source: []const u8) Parser {
+    pub fn init(allocator: std.mem.Allocator, source: []const u8, limits: Limits) !Parser {
+        if (source.len > limits.source_bytes_max) {
+            return ParserError.SourceTooLarge;
+        }
         var lexer = Lexer.init(source);
-        const interner = Interner.init(allocator, std.math.maxInt(u16));
+        const interner = Interner.init(
+            allocator,
+            limits.symbol_count_max,
+            limits.identifier_bytes_max,
+        );
         const token_current = lexer.next();
         const token_peek = lexer.next();
         return .{
@@ -40,6 +56,7 @@ pub const Parser = struct {
             .interner = interner,
             .token_current = token_current,
             .token_peek = token_peek,
+            .limits = limits,
         };
     }
 
@@ -75,11 +92,17 @@ pub const Parser = struct {
                 .kw_type => {
                     const type_decl = try self.parse_type();
                     errdefer type_decl.deinit(self.allocator);
+                    if (types.items.len >= self.limits.types_max) {
+                        return ParserError.TooManyTypes;
+                    }
                     try types.append(self.allocator, type_decl);
                 },
                 .kw_condition => {
                     const condition = try self.parse_condition();
                     errdefer condition.deinit(self.allocator);
+                    if (conditions.items.len >= self.limits.conditions_max) {
+                        return ParserError.TooManyConditions;
+                    }
                     try conditions.append(self.allocator, condition);
                 },
                 .illegal => {
@@ -140,6 +163,9 @@ pub const Parser = struct {
 
         while (true) {
             const parameter = try self.parse_condition_parameter();
+            if (parameters.items.len >= self.limits.parameters_per_condition_max) {
+                return ParserError.TooManyParameters;
+            }
             try parameters.append(self.allocator, parameter);
             if (!self.match(.comma)) break;
         }
@@ -229,6 +255,9 @@ pub const Parser = struct {
         _ = try self.consume(.colon);
         var expr_span: ast.Span = undefined;
         try self.skip_relation_expression(&expr_span);
+        if (relations.items.len >= self.limits.relations_per_type_max) {
+            return ParserError.TooManyRelations;
+        }
         try relations.append(self.allocator, .{
             .name = name,
             .cardinality = cardinality,
@@ -374,7 +403,7 @@ const TestModel = struct {
 
     fn parse(source: []const u8) !TestModel {
         const allocator = testing.allocator;
-        var parser = Parser.init(allocator, source);
+        var parser = try Parser.init(allocator, source, .{});
         errdefer parser.deinit();
 
         const model = try parser.parse_model();
@@ -443,7 +472,7 @@ fn expect_parameter(
 }
 
 fn expect_parse_error(expected: anyerror, source: []const u8) !void {
-    var parser = Parser.init(testing.allocator, source);
+    var parser = try Parser.init(testing.allocator, source, .{});
     defer parser.deinit();
     var model = parser.parse_model() catch |err| {
         try testing.expectEqual(expected, err);

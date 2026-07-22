@@ -17,6 +17,7 @@ pub const SymbolId = enum(u16) {
 
 const InternerError = error{
     TooManySymbols,
+    IdentifierTooLong,
 };
 
 pub const Interner = struct {
@@ -24,13 +25,19 @@ pub const Interner = struct {
     name_by_id: ArrayList,
     id_by_name: Map,
     symbol_id_max: usize,
+    identifier_bytes_max: usize,
 
-    pub fn init(allocator: std.mem.Allocator, symbol_id_max: usize) Interner {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        symbol_id_max: usize,
+        identifier_bytes_max: usize,
+    ) Interner {
         return .{
             .allocator = allocator,
             .name_by_id = .empty,
             .id_by_name = .empty,
             .symbol_id_max = symbol_id_max,
+            .identifier_bytes_max = identifier_bytes_max,
         };
     }
 
@@ -52,6 +59,10 @@ pub const Interner = struct {
             const name_owned = try self.allocator.dupe(u8, name);
             errdefer self.allocator.free(name_owned);
 
+            if (name_owned.len > self.identifier_bytes_max) {
+                return InternerError.IdentifierTooLong;
+            }
+
             try self.name_by_id.append(self.allocator, name_owned);
             errdefer _ = self.name_by_id.pop();
 
@@ -65,7 +76,7 @@ pub const Interner = struct {
 };
 
 test "interner" {
-    var interner = Interner.init(std.testing.allocator, std.math.maxInt(u16));
+    var interner = Interner.init(std.testing.allocator, std.math.maxInt(u16), 255);
     defer interner.deinit();
 
     try testing.expectEqual(SymbolId.from_int(0), try interner.intern("foo"));
@@ -76,12 +87,13 @@ test "interner" {
 
 test "interner max symbols" {
     const allocator = std.testing.allocator;
-    const limit = 8;
-    var interner = Interner.init(allocator, limit);
+    const symbol_count_max = 8;
+    const identifier_bytes_max = 255;
+    var interner = Interner.init(allocator, symbol_count_max, identifier_bytes_max);
     defer interner.deinit();
 
     var i: usize = 0;
-    while (i <= limit) : (i += 1) {
+    while (i <= symbol_count_max) : (i += 1) {
         const symbol = try std.fmt.allocPrint(allocator, "foo{}", .{i});
         defer allocator.free(symbol);
         _ = try interner.intern(symbol);

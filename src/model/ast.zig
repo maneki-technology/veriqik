@@ -49,11 +49,11 @@ pub const Parameter = struct {
 
 pub const Condition = struct {
     name: Identifier,
-    params: []const Parameter = &.{},
+    parameters: []const Parameter = &.{},
     span: Span,
 
     pub fn deinit(self: *const Condition, allocator: std.mem.Allocator) void {
-        allocator.free(self.params);
+        allocator.free(self.parameters);
     }
 };
 
@@ -66,8 +66,8 @@ pub const Model = struct {
             type_decl.deinit(allocator);
         }
         allocator.free(self.types);
-        for (self.conditions) |*cond| {
-            cond.deinit(allocator);
+        for (self.conditions) |*condition| {
+            condition.deinit(allocator);
         }
         allocator.free(self.conditions);
         self.* = undefined;

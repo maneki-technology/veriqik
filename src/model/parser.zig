@@ -1,18 +1,18 @@
 const std = @import("std");
-const token = @import("token.zig");
-const Token = token.Token;
-const TokenType = token.TokenType;
+const token_module = @import("token.zig");
+const Token = token_module.Token;
+const TokenType = token_module.TokenType;
 
-const lexer = @import("lexer.zig");
-const Lexer = lexer.Lexer;
+const lexer_module = @import("lexer.zig");
+const Lexer = lexer_module.Lexer;
 
 const ast = @import("ast.zig");
 const ArrayList = std.ArrayList;
 const testing = std.testing;
 
-const symbol = @import("symbol.zig");
-const SymbolId = symbol.SymbolId;
-const Interner = symbol.Interner;
+const symbol_module = @import("symbol.zig");
+const SymbolId = symbol_module.SymbolId;
+const Interner = symbol_module.Interner;
 
 const ParserError = error{
     IllegalCharacter,
@@ -21,66 +21,65 @@ const ParserError = error{
 };
 
 pub const Parser = struct {
-    alloc: std.mem.Allocator,
-    l: Lexer,
-    i: Interner,
-    curr: Token,
-    peek: Token,
+    allocator: std.mem.Allocator,
+    lexer: Lexer,
+    interner: Interner,
+    token_current: Token,
+    token_peek: Token,
     // TODO: diagnostic/error state
 
     pub fn init(allocator: std.mem.Allocator, source: []const u8) Parser {
-        var l = Lexer.init(source);
-        const i = Interner.init(allocator, std.math.maxInt(u16));
-        const curr = l.next();
-        const peek = l.next();
-        const parser = Parser{
-            .alloc = allocator,
-            .l = l,
-            .i = i,
-            .curr = curr,
-            .peek = peek,
+        var lexer = Lexer.init(source);
+        const interner = Interner.init(allocator, std.math.maxInt(u16));
+        const token_current = lexer.next();
+        const token_peek = lexer.next();
+        return .{
+            .allocator = allocator,
+            .lexer = lexer,
+            .interner = interner,
+            .token_current = token_current,
+            .token_peek = token_peek,
         };
-        return parser;
     }
 
     pub fn deinit(self: *Parser) void {
-        self.i.deinit();
+        self.interner.deinit();
         self.* = undefined;
     }
 
     fn advance(self: *Parser) void {
-        self.curr = self.peek;
-        self.peek = self.l.next();
+        self.token_current = self.token_peek;
+        self.token_peek = self.lexer.next();
     }
 
-    pub fn parseModel(self: *Parser) !ast.Model {
+    pub fn parse_model(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
         errdefer {
             for (types.items) |*type_decl| {
-                type_decl.deinit(self.alloc);
+                type_decl.deinit(self.allocator);
             }
-            types.deinit(self.alloc);
+            types.deinit(self.allocator);
         }
 
         var conditions: ArrayList(ast.Condition) = .empty;
         errdefer {
-            for (conditions.items) |*cond| {
-                cond.deinit(self.alloc);
+            for (conditions.items) |*condition| {
+                condition.deinit(self.allocator);
             }
-            conditions.deinit(self.alloc);
+            conditions.deinit(self.allocator);
         }
 
-        while (!self.currIs(.eof)) {
-            switch (self.curr.type) {
+        while (!self.current_token_is(.eof)) {
+            switch (self.token_current.type) {
                 .kw_type => {
-                    const type_decl = try self.parseType();
-                    errdefer type_decl.deinit(self.alloc);
-                    try types.append(self.alloc, type_decl);
+                    const type_decl = try self.parse_type();
+                    errdefer type_decl.deinit(self.allocator);
+                    try types.append(self.allocator, type_decl);
                 },
                 .kw_condition => {
-                    const condition = try self.parseCondition();
-                    errdefer condition.deinit(self.alloc);
-                    try conditions.append(self.alloc, condition);
+                    const condition = try self.parse_condition();
+                    errdefer condition.deinit(self.allocator);
+                    try conditions.append(self.allocator, condition);
                 },
                 .illegal => {
                     return ParserError.IllegalCharacter;
@@ -91,99 +90,101 @@ pub const Parser = struct {
             }
         }
 
-        const owned_types = try types.toOwnedSlice(self.alloc);
+        const types_owned = try types.toOwnedSlice(self.allocator);
         errdefer {
-            for (owned_types) |*owned_type| {
-                owned_type.deinit(self.alloc);
+            for (types_owned) |*type_owned| {
+                type_owned.deinit(self.allocator);
             }
-            self.alloc.free(owned_types);
+            self.allocator.free(types_owned);
         }
-        const owned_conditions = try conditions.toOwnedSlice(self.alloc);
+        const conditions_owned = try conditions.toOwnedSlice(self.allocator);
         errdefer {
-            for (owned_conditions) |*owned_condition| {
-                owned_condition.deinit(self.alloc);
+            for (conditions_owned) |*condition_owned| {
+                condition_owned.deinit(self.allocator);
             }
-            self.alloc.free(owned_conditions);
+            self.allocator.free(conditions_owned);
         }
 
         return .{
-            .types = owned_types,
-            .conditions = owned_conditions,
+            .types = types_owned,
+            .conditions = conditions_owned,
         };
     }
 
-    fn parseCondition(self: *Parser) !ast.Condition {
-        const cond = try self.consume(.kw_condition);
-        const name = try self.parseIdentifier();
+    fn parse_condition(self: *Parser) !ast.Condition {
+        const condition = try self.consume(.kw_condition);
+        const name = try self.parse_identifier();
         _ = try self.consume(.l_paren);
 
-        var params: ArrayList(ast.Parameter) = .empty;
-        errdefer params.deinit(self.alloc);
-        try self.parseConditionParams(&params);
+        var parameters: ArrayList(ast.Parameter) = .empty;
+        errdefer parameters.deinit(self.allocator);
+        try self.parse_condition_parameters(&parameters);
         _ = try self.consume(.r_paren);
 
-        const body = try self.skipOpaqueBody();
+        const body = try self.skip_opaque_body();
+        const parameters_owned = try parameters.toOwnedSlice(self.allocator);
+        errdefer self.allocator.free(parameters_owned);
         return .{
             .name = name,
-            .params = try params.toOwnedSlice(self.alloc),
+            .parameters = parameters_owned,
             .span = .{
-                .start = cond.start,
+                .start = condition.start,
                 .end = body.end,
             },
         };
     }
 
-    fn parseConditionParams(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
-        if (self.currIs(.r_paren)) return;
+    fn parse_condition_parameters(self: *Parser, parameters: *ArrayList(ast.Parameter)) !void {
+        if (self.current_token_is(.r_paren)) return;
 
         while (true) {
-            const param = try self.parseConditionParam();
-            try params.append(self.alloc, param);
+            const parameter = try self.parse_condition_parameter();
+            try parameters.append(self.allocator, parameter);
             if (!self.match(.comma)) break;
         }
     }
 
-    fn parseConditionParam(self: *Parser) !ast.Parameter {
-        const name = try self.parseIdentifier();
+    fn parse_condition_parameter(self: *Parser) !ast.Parameter {
+        const name = try self.parse_identifier();
         _ = try self.consume(.colon);
-        const typeRef = try self.parseValueTypeRef();
+        const type_ref = try self.parse_value_type_ref();
         return .{
             .name = name,
-            .type = typeRef,
+            .type = type_ref,
             .span = .{
                 .start = name.span.start,
-                .end = typeRef.span.end,
+                .end = type_ref.span.end,
             },
         };
     }
 
-    fn parseType(self: *Parser) !ast.Type {
+    fn parse_type(self: *Parser) !ast.Type {
         const type_decl = try self.consume(.kw_type);
-        const name = try self.parseIdentifier();
-        var bodySpan: ast.Span = undefined;
+        const name = try self.parse_identifier();
+        var body_span: ast.Span = undefined;
         var relations: ArrayList(ast.Relation) = .empty;
-        errdefer relations.deinit(self.alloc);
-        try self.parseBody(&bodySpan, &relations);
+        errdefer relations.deinit(self.allocator);
+        try self.parse_type_body(&body_span, &relations);
 
-        const owned_relations = try relations.toOwnedSlice(self.alloc);
-        errdefer self.alloc.free(owned_relations);
+        const relations_owned = try relations.toOwnedSlice(self.allocator);
+        errdefer self.allocator.free(relations_owned);
 
         return .{
             .name = name,
-            .relations = owned_relations,
+            .relations = relations_owned,
             .span = .{
                 .start = type_decl.start,
-                .end = bodySpan.end,
+                .end = body_span.end,
             },
         };
     }
 
-    fn parseBody(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
+    fn parse_type_body(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
         const opening = try self.consume(.l_brace);
-        while (!self.currIs(.r_brace)) {
-            switch (self.curr.type) {
-                .kw_relation => try self.parseRelation(relations),
-                .kw_permission => try self.parsePermission(),
+        while (!self.current_token_is(.r_brace)) {
+            switch (self.token_current.type) {
+                .kw_relation => try self.parse_relation(relations),
+                .kw_permission => try self.parse_permission(),
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
                 else => return ParserError.UnexpectedToken,
@@ -196,25 +197,25 @@ pub const Parser = struct {
         };
     }
 
-    fn parseRelation(self: *Parser, relations: *ArrayList(ast.Relation)) !void {
+    fn parse_relation(self: *Parser, relations: *ArrayList(ast.Relation)) !void {
         const relation_decl = try self.consume(.kw_relation);
-        const name = try self.parseIdentifier();
+        const name = try self.parse_identifier();
         var cardinality: ?ast.Cardinality = null;
         if (self.match(.l_bracket)) {
             cardinality = .{ .max = null };
-            switch (self.curr.type) {
+            switch (self.token_current.type) {
                 .range => {
                     _ = try self.consume(.range);
-                    if (self.currIs(.integer)) {
-                        cardinality.?.max = try self.parseInteger();
+                    if (self.current_token_is(.integer)) {
+                        cardinality.?.max = try self.parse_integer();
                     }
                     _ = try self.consume(.r_bracket);
                 },
                 .integer => {
-                    cardinality.?.min = try self.parseInteger();
+                    cardinality.?.min = try self.parse_integer();
                     _ = try self.consume(.range);
-                    if (self.currIs(.integer)) {
-                        cardinality.?.max = try self.parseInteger();
+                    if (self.current_token_is(.integer)) {
+                        cardinality.?.max = try self.parse_integer();
                     }
                     _ = try self.consume(.r_bracket);
                 },
@@ -225,36 +226,36 @@ pub const Parser = struct {
             return ParserError.UnexpectedToken;
         }
         _ = try self.consume(.colon);
-        var exprSpan: ast.Span = undefined;
-        try self.skipRelationExpression(&exprSpan);
-        try relations.append(self.alloc, .{
+        var expr_span: ast.Span = undefined;
+        try self.skip_relation_expression(&expr_span);
+        try relations.append(self.allocator, .{
             .name = name,
             .cardinality = cardinality,
             .span = .{
                 .start = relation_decl.start,
-                .end = exprSpan.end,
+                .end = expr_span.end,
             },
         });
     }
 
-    fn skipRelationExpression(self: *Parser, span: *ast.Span) !void {
+    fn skip_relation_expression(self: *Parser, span: *ast.Span) !void {
         // Empty expression
-        if (self.currIs(.kw_relation) or
-            self.currIs(.kw_permission) or
-            self.currIs(.r_brace) or
-            self.currIs(.eof))
+        if (self.current_token_is(.kw_relation) or
+            self.current_token_is(.kw_permission) or
+            self.current_token_is(.r_brace) or
+            self.current_token_is(.eof))
         {
             return ParserError.UnexpectedToken;
         }
 
-        const start = self.curr.start;
-        var end = self.curr.end;
+        const start = self.token_current.start;
+        var end = self.token_current.end;
         while (true) {
-            switch (self.curr.type) {
+            switch (self.token_current.type) {
                 .kw_relation, .kw_permission, .r_brace, .eof => break,
                 .illegal => return ParserError.IllegalCharacter,
                 else => {
-                    end = self.curr.end;
+                    end = self.token_current.end;
                     self.advance();
                 },
             }
@@ -265,29 +266,29 @@ pub const Parser = struct {
         };
     }
 
-    fn parseInteger(self: *Parser) !usize {
-        const tok = try self.consume(.integer);
-        return std.fmt.parseUnsigned(usize, self.lexeme(tok), 10) catch ParserError.IllegalCharacter;
+    fn parse_integer(self: *Parser) !usize {
+        const token = try self.consume(.integer);
+        return std.fmt.parseUnsigned(usize, self.lexeme(token), 10) catch ParserError.IllegalCharacter;
     }
 
-    fn parsePermission(_: *Parser) !void {
+    fn parse_permission(_: *Parser) !void {
         return ParserError.ReservedKeyword;
     }
 
-    fn parseIdentifier(self: *Parser) !ast.Identifier {
-        const tok = try self.consume(.identifier);
-        const s = try self.intern(self.lexeme(tok));
+    fn parse_identifier(self: *Parser) !ast.Identifier {
+        const identifier = try self.consume(.identifier);
+        const symbol = try self.intern(self.lexeme(identifier));
         return .{
-            .symbol = s,
+            .symbol = symbol,
             .span = .{
-                .start = tok.start,
-                .end = tok.end,
+                .start = identifier.start,
+                .end = identifier.end,
             },
         };
     }
 
-    fn parseValueTypeRef(self: *Parser) !ast.ValueTypeRef {
-        const name = try self.parseIdentifier();
+    fn parse_value_type_ref(self: *Parser) !ast.ValueTypeRef {
+        const name = try self.parse_identifier();
         var end = name.span.end;
         var collection = false;
         if (self.match(.l_bracket)) {
@@ -307,10 +308,10 @@ pub const Parser = struct {
         };
     }
 
-    fn skipOpaqueBody(self: *Parser) !ast.Span {
+    fn skip_opaque_body(self: *Parser) !ast.Span {
         const opening = try self.consume(.l_brace);
-        while (!self.currIs(.r_brace)) {
-            switch (self.curr.type) {
+        while (!self.current_token_is(.r_brace)) {
+            switch (self.token_current.type) {
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
                 else => self.advance(),
@@ -326,39 +327,39 @@ pub const Parser = struct {
 
     // HELPERS
     fn consume(self: *Parser, expected: TokenType) !Token {
-        try self.expectCurr(expected);
-        const consumed = self.curr;
+        try self.expect_current_token(expected);
+        const consumed = self.token_current;
         self.advance();
         return consumed;
     }
 
     fn match(self: *Parser, expected: TokenType) bool {
-        if (!self.currIs(expected)) {
+        if (!self.current_token_is(expected)) {
             return false;
         }
         self.advance();
         return true;
     }
 
-    fn currIs(self: *Parser, expected: TokenType) bool {
-        return self.curr.type == expected;
+    fn current_token_is(self: *Parser, expected: TokenType) bool {
+        return self.token_current.type == expected;
     }
 
-    fn expectCurr(self: *Parser, expected: TokenType) !void {
-        if (self.currIs(.illegal)) {
+    fn expect_current_token(self: *Parser, expected: TokenType) !void {
+        if (self.current_token_is(.illegal)) {
             return ParserError.IllegalCharacter;
         }
-        if (!self.currIs(expected)) {
+        if (!self.current_token_is(expected)) {
             return ParserError.UnexpectedToken;
         }
     }
 
-    fn lexeme(self: *Parser, t: Token) []const u8 {
-        return self.l.lexeme(t);
+    fn lexeme(self: *Parser, token: Token) []const u8 {
+        return self.lexer.lexeme(token);
     }
 
     fn intern(self: *Parser, name: []const u8) !SymbolId {
-        return self.i.intern(name);
+        return self.interner.intern(name);
     }
 };
 
@@ -367,11 +368,11 @@ const TestModel = struct {
     model: ast.Model,
 
     fn parse(source: []const u8) !TestModel {
-        const alloc = testing.allocator;
-        var parser = Parser.init(alloc, source);
+        const allocator = testing.allocator;
+        var parser = Parser.init(allocator, source);
         errdefer parser.deinit();
 
-        const model = try parser.parseModel();
+        const model = try parser.parse_model();
         return .{
             .parser = parser,
             .model = model,
@@ -384,13 +385,13 @@ const TestModel = struct {
     }
 };
 
-fn expectSpanText(source: []const u8, span: ast.Span, expected: []const u8) !void {
+fn expect_span_text(source: []const u8, span: ast.Span, expected: []const u8) !void {
     try testing.expect(span.start <= span.end);
     try testing.expect(span.end <= source.len);
     try testing.expectEqualStrings(expected, source[span.start..span.end]);
 }
 
-fn expectExactSpan(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
+fn expect_exact_span(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
     const start = std.mem.indexOf(u8, source, expected_text).?;
     try testing.expectEqual(ast.Span{
         .start = start,
@@ -398,11 +399,11 @@ fn expectExactSpan(source: []const u8, actual: ast.Span, expected_text: []const 
     }, actual);
 }
 
-fn expectIdentifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
-    try expectSpanText(source, actual.span, expected);
+fn expect_identifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
+    try expect_span_text(source, actual.span, expected);
 }
 
-fn expectRelation(
+fn expect_relation(
     source: []const u8,
     actual: ast.Relation,
     expected: struct {
@@ -410,11 +411,11 @@ fn expectRelation(
         cardinality: ?ast.Cardinality,
     },
 ) !void {
-    try expectIdentifier(source, actual.name, expected.name);
+    try expect_identifier(source, actual.name, expected.name);
     try testing.expectEqual(expected.cardinality, actual.cardinality);
 }
 
-fn expectParameter(
+fn expect_parameter(
     source: []const u8,
     actual: ast.Parameter,
     expected: struct {
@@ -424,11 +425,11 @@ fn expectParameter(
         collection: bool = false,
     },
 ) !void {
-    try expectIdentifier(source, actual.name, expected.name);
-    try expectIdentifier(source, actual.type.name, expected.type_name);
-    try expectSpanText(source, actual.span, expected.declaration);
+    try expect_identifier(source, actual.name, expected.name);
+    try expect_identifier(source, actual.type.name, expected.type_name);
+    try expect_span_text(source, actual.span, expected.declaration);
     const type_start = std.mem.indexOf(u8, expected.declaration, expected.type_name).?;
-    try expectSpanText(
+    try expect_span_text(
         source,
         actual.type.span,
         expected.declaration[type_start..],
@@ -436,10 +437,10 @@ fn expectParameter(
     try testing.expectEqual(expected.collection, actual.type.collection);
 }
 
-fn expectParseError(expected: anyerror, source: []const u8) !void {
+fn expect_parse_error(expected: anyerror, source: []const u8) !void {
     var parser = Parser.init(testing.allocator, source);
     defer parser.deinit();
-    var model = parser.parseModel() catch |err| {
+    var model = parser.parse_model() catch |err| {
         try testing.expectEqual(expected, err);
         return;
     };
@@ -454,8 +455,8 @@ test "parse model with simple type" {
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
     try testing.expectEqual(@as(usize, 0), parsed.model.conditions.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "User");
-    try expectSpanText(source, parsed.model.types[0].span, source);
+    try expect_identifier(source, parsed.model.types[0].name, "User");
+    try expect_span_text(source, parsed.model.types[0].span, source);
 }
 
 test "parse model with type with body" {
@@ -468,20 +469,20 @@ test "parse model with type with body" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
-    try expectSpanText(source, parsed.model.types[0].span, source);
+    try expect_span_text(source, parsed.model.types[0].span, source);
 }
 
 test "parse model with type with illegal character" {
-    try expectParseError(ParserError.IllegalCharacter, "type User { @ }");
+    try expect_parse_error(ParserError.IllegalCharacter, "type User { @ }");
 }
 
 test "parse model with type missing closing brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10]: User",
     );
@@ -495,9 +496,9 @@ test "parse model with empty condition" {
     try testing.expectEqual(@as(usize, 0), parsed.model.types.len);
     try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
     const condition = parsed.model.conditions[0];
-    try expectIdentifier(source, condition.name, "allow");
-    try testing.expectEqual(@as(usize, 0), condition.params.len);
-    try expectSpanText(source, condition.span, source);
+    try expect_identifier(source, condition.name, "allow");
+    try testing.expectEqual(@as(usize, 0), condition.parameters.len);
+    try expect_span_text(source, condition.span, source);
 }
 
 test "parse model with simple condition" {
@@ -506,14 +507,14 @@ test "parse model with simple condition" {
     defer parsed.deinit();
 
     const condition = parsed.model.conditions[0];
-    try expectIdentifier(source, condition.name, "allow_ip");
-    try testing.expectEqual(@as(usize, 1), condition.params.len);
-    try expectParameter(source, condition.params[0], .{
+    try expect_identifier(source, condition.name, "allow_ip");
+    try testing.expectEqual(@as(usize, 1), condition.parameters.len);
+    try expect_parameter(source, condition.parameters[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress",
     });
-    try expectSpanText(source, condition.span, source);
+    try expect_span_text(source, condition.span, source);
 }
 
 test "parse model with condition with array param" {
@@ -522,8 +523,8 @@ test "parse model with condition with array param" {
     defer parsed.deinit();
 
     const condition = parsed.model.conditions[0];
-    try testing.expectEqual(@as(usize, 1), condition.params.len);
-    try expectParameter(source, condition.params[0], .{
+    try testing.expectEqual(@as(usize, 1), condition.parameters.len);
+    try expect_parameter(source, condition.parameters[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress[]",
@@ -537,13 +538,13 @@ test "parse model with condition with multiple params" {
     defer parsed.deinit();
 
     const condition = parsed.model.conditions[0];
-    try testing.expectEqual(@as(usize, 2), condition.params.len);
-    try expectParameter(source, condition.params[0], .{
+    try testing.expectEqual(@as(usize, 2), condition.parameters.len);
+    try expect_parameter(source, condition.parameters[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress",
     });
-    try expectParameter(source, condition.params[1], .{
+    try expect_parameter(source, condition.parameters[1], .{
         .name = "port",
         .type_name = "Port",
         .declaration = "port: Port",
@@ -557,9 +558,9 @@ test "parse model with multiple declarations" {
 
     try testing.expectEqual(@as(usize, 2), parsed.model.types.len);
     try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "User");
-    try expectIdentifier(source, parsed.model.conditions[0].name, "allow");
-    try expectIdentifier(source, parsed.model.types[1].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "User");
+    try expect_identifier(source, parsed.model.conditions[0].name, "allow");
+    try expect_identifier(source, parsed.model.types[1].name, "Group");
 }
 
 test "repeated identifiers share a symbol" {
@@ -567,9 +568,9 @@ test "repeated identifiers share a symbol" {
     var parsed = try TestModel.parse(source);
     defer parsed.deinit();
 
-    const params = parsed.model.conditions[0].params;
-    try testing.expectEqual(@as(usize, 2), params.len);
-    try testing.expectEqual(params[0].type.name.symbol, params[1].type.name.symbol);
+    const parameters = parsed.model.conditions[0].parameters;
+    try testing.expectEqual(@as(usize, 2), parameters.len);
+    try testing.expectEqual(parameters[0].type.name.symbol, parameters[1].type.name.symbol);
 }
 
 test "declaration spans exclude surrounding source" {
@@ -581,62 +582,62 @@ test "declaration spans exclude surrounding source" {
     var parsed = try TestModel.parse(source);
     defer parsed.deinit();
 
-    try expectExactSpan(source, parsed.model.types[0].span, "type User {}");
-    try expectExactSpan(source, parsed.model.conditions[0].span, "condition allow() {}");
-    try expectExactSpan(source, parsed.model.types[1].span, "type Group {}");
+    try expect_exact_span(source, parsed.model.types[0].span, "type User {}");
+    try expect_exact_span(source, parsed.model.conditions[0].span, "condition allow() {}");
+    try expect_exact_span(source, parsed.model.types[1].span, "type Group {}");
 }
 
 test "parse model with condition with illegal character" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "condition allow_ip(ip: IpAddress) { @ }",
     );
 }
 
 test "parse model with condition missing opening paren" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip ip: IpAddress {}",
     );
 }
 
 test "parse model with condition missing closing paren" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress {}",
     );
 }
 
 test "parse model with condition missing opening brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress)",
     );
 }
 
 test "parse model with condition missing closing brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress) {",
     );
 }
 
 test "parse model with condition missing opening bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress]) {}",
     );
 }
 
 test "parse model with condition missing closing bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress[) {}",
     );
 }
 
 test "parse model with mixed valid and invalid conditions" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress) {} condition allow() {",
     );
@@ -653,13 +654,13 @@ test "parse model with a type with multiple relations" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
     try testing.expectEqual(@as(usize, 2), parsed.model.types[0].relations.len);
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
-    try expectRelation(source, parsed.model.types[0].relations[1], .{
+    try expect_relation(source, parsed.model.types[0].relations[1], .{
         .name = "owner",
         .cardinality = null,
     });
@@ -675,9 +676,9 @@ test "parse model with a type with relation without upper bound" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
     try testing.expectEqual(@as(usize, 1), parsed.model.types[0].relations.len);
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 1, .max = null },
     });
@@ -693,9 +694,9 @@ test "parse model with a type with relation without lower bound" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
     try testing.expectEqual(@as(usize, 1), parsed.model.types[0].relations.len);
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
@@ -714,91 +715,91 @@ test "parse a simple model with valid relations" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 2), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "User");
-    try expectIdentifier(source, parsed.model.types[1].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "User");
+    try expect_identifier(source, parsed.model.types[1].name, "Group");
     try testing.expectEqual(@as(usize, 2), parsed.model.types[1].relations.len);
-    try expectRelation(source, parsed.model.types[1].relations[0], .{
+    try expect_relation(source, parsed.model.types[1].relations[0], .{
         .name = "owner",
         .cardinality = null,
     });
-    try expectRelation(source, parsed.model.types[1].relations[1], .{
+    try expect_relation(source, parsed.model.types[1].relations[1], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
 }
 
 test "parse model with a type missing opening brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User }",
     );
 }
 
 test "parse model with a type with a relation with missing closing bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10: User }",
     );
 }
 
 test "parse model with a type with a relation with missing opening bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member 0..10]: User }",
     );
 }
 
 test "parse model with a type with a relation with missing range token" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member [ 10]: User }",
     );
 }
 
 test "parse model with a type with a relation with missing colon" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10] User }",
     );
 }
 
 test "parse model with mixed valid and invalid types" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User {} type Group {",
     );
 }
 
 test "parse model with a relation with repeated range" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10..20]: User }",
     );
 }
 
 test "parse model with a relation with empty expression" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type Group { relation member: }",
     );
 }
 
 test "parse model with a relation with illegal character in expression" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "type Group { relation member: @ }",
     );
 }
 
 test "parse model with a relation with illegal character in declaration" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "type Group { relation member@: User }",
     );
 }
 
 test "parse model with a relation with illegal character in cardinality" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "type Group { relation member[0..10@]: User }",
     );

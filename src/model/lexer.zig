@@ -177,7 +177,11 @@ pub const Lexer = struct {
     }
 
     fn read_identifier_token(self: *Lexer) Token {
-        var token = Token{ .type = TokenType.identifier, .start = self.position, .end = self.position };
+        var token = Token{
+            .type = TokenType.identifier,
+            .start = self.position,
+            .end = self.position,
+        };
         while (self.is_identifier_continue()) {
             self.advance();
         }
@@ -193,7 +197,11 @@ pub const Lexer = struct {
     }
 
     fn read_number_token(self: *Lexer) Token {
-        var token = Token{ .type = TokenType.integer, .start = self.position, .end = self.position };
+        var token = Token{
+            .type = TokenType.integer,
+            .start = self.position,
+            .end = self.position,
+        };
         while (self.is_digit()) {
             self.advance();
         }
@@ -344,10 +352,14 @@ test "lookahead tokens same first char consecutive" {
 test "keywords" {
     const input = "type relation permission condition with in self";
     const expected = [_]ExpectedToken{
-        .{ .type = .kw_type, .lexeme = "type" },             .{ .type = .kw_relation, .lexeme = "relation" },
-        .{ .type = .kw_permission, .lexeme = "permission" }, .{ .type = .kw_condition, .lexeme = "condition" },
-        .{ .type = .kw_with, .lexeme = "with" },             .{ .type = .kw_in, .lexeme = "in" },
-        .{ .type = .kw_self, .lexeme = "self" },             .{ .type = .eof, .lexeme = "" },
+        .{ .type = .kw_type, .lexeme = "type" },
+        .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .kw_permission, .lexeme = "permission" },
+        .{ .type = .kw_condition, .lexeme = "condition" },
+        .{ .type = .kw_with, .lexeme = "with" },
+        .{ .type = .kw_in, .lexeme = "in" },
+        .{ .type = .kw_self, .lexeme = "self" },
+        .{ .type = .eof, .lexeme = "" },
     };
     try expect_tokens(input, &expected);
 }
@@ -372,7 +384,10 @@ test "integers" {
 }
 
 test "comments" {
-    const input = "// this is a comment\n// this is another comment\r// this is yet another comment\r\n";
+    const input =
+        "// this is a comment\n" ++
+        "// this is another comment\r" ++
+        "// this is yet another comment\r\n";
     const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
     try expect_tokens(input, &expected);
 }
@@ -415,15 +430,24 @@ test "simple type with cardinality bounds and comments" {
         \\//
     ;
     const expected = [_]ExpectedToken{
-        .{ .type = .kw_type, .lexeme = "type" },             .{ .type = .identifier, .lexeme = "Team" },
-        .{ .type = .l_brace, .lexeme = "{" },                .{ .type = .kw_relation, .lexeme = "relation" },
-        .{ .type = .identifier, .lexeme = "member" },        .{ .type = .l_bracket, .lexeme = "[" },
-        .{ .type = .integer, .lexeme = "0" },                .{ .type = .range, .lexeme = ".." },
-        .{ .type = .integer, .lexeme = "10" },               .{ .type = .r_bracket, .lexeme = "]" },
-        .{ .type = .colon, .lexeme = ":" },                  .{ .type = .identifier, .lexeme = "User" },
-        .{ .type = .kw_permission, .lexeme = "permission" }, .{ .type = .identifier, .lexeme = "members" },
-        .{ .type = .assign, .lexeme = "=" },                 .{ .type = .identifier, .lexeme = "member" },
-        .{ .type = .r_brace, .lexeme = "}" },                .{ .type = .eof, .lexeme = "" },
+        .{ .type = .kw_type, .lexeme = "type" },
+        .{ .type = .identifier, .lexeme = "Team" },
+        .{ .type = .l_brace, .lexeme = "{" },
+        .{ .type = .kw_relation, .lexeme = "relation" },
+        .{ .type = .identifier, .lexeme = "member" },
+        .{ .type = .l_bracket, .lexeme = "[" },
+        .{ .type = .integer, .lexeme = "0" },
+        .{ .type = .range, .lexeme = ".." },
+        .{ .type = .integer, .lexeme = "10" },
+        .{ .type = .r_bracket, .lexeme = "]" },
+        .{ .type = .colon, .lexeme = ":" },
+        .{ .type = .identifier, .lexeme = "User" },
+        .{ .type = .kw_permission, .lexeme = "permission" },
+        .{ .type = .identifier, .lexeme = "members" },
+        .{ .type = .assign, .lexeme = "=" },
+        .{ .type = .identifier, .lexeme = "member" },
+        .{ .type = .r_brace, .lexeme = "}" },
+        .{ .type = .eof, .lexeme = "" },
     };
     try expect_tokens(input, &expected);
 }

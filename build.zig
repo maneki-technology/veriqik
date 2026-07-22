@@ -37,4 +37,22 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&run_module_tests.step);
+
+    const check_formatting = b.addFmt(.{
+        .paths = &.{ "build.zig", "build.zig.zon", "src", "tools" },
+        .check = true,
+    });
+
+    const style_checker = b.addExecutable(.{
+        .name = "tiger_style",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/tiger_style.zig"),
+            .target = b.graph.host,
+        }),
+    });
+    const run_style_checker = b.addRunArtifact(style_checker);
+
+    const style_step = b.step("style", "Check TigerStyle rules");
+    style_step.dependOn(&check_formatting.step);
+    style_step.dependOn(&run_style_checker.step);
 }

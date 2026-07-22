@@ -107,7 +107,7 @@ pub const Lexer = struct {
     }
 
     fn read_lookahead_character_token(self: *Lexer) Token {
-        var t = Token{
+        var token = Token{
             .type = TokenType.illegal,
             .start = self.position,
             .end = self.position + 1,
@@ -115,93 +115,90 @@ pub const Lexer = struct {
         switch (self.current()) {
             '=' => {
                 if (self.peek() == '=') {
-                    t.type = TokenType.equal_equal;
-                    t.end = self.position + 2;
+                    token.type = TokenType.equal_equal;
+                    token.end = self.position + 2;
                     self.advance();
                 } else {
-                    t.type = TokenType.assign;
-                    return t;
+                    token.type = TokenType.assign;
+                    return token;
                 }
             },
             '<' => {
                 if (self.peek() == '=') {
-                    t.type = TokenType.less_equal;
-                    t.end = self.position + 2;
+                    token.type = TokenType.less_equal;
+                    token.end = self.position + 2;
                     self.advance();
                 } else {
-                    t.type = TokenType.less;
-                    return t;
+                    token.type = TokenType.less;
+                    return token;
                 }
             },
             '>' => {
                 if (self.peek() == '=') {
-                    t.type = TokenType.greater_equal;
-                    t.end = self.position + 2;
+                    token.type = TokenType.greater_equal;
+                    token.end = self.position + 2;
                     self.advance();
                 } else {
-                    t.type = TokenType.greater;
-                    return t;
+                    token.type = TokenType.greater;
+                    return token;
                 }
             },
             '!' => {
                 if (self.peek() == '=') {
-                    t.type = TokenType.bang_equal;
-                    t.end = self.position + 2;
+                    token.type = TokenType.bang_equal;
+                    token.end = self.position + 2;
                     self.advance();
                 } else {
-                    t.type = TokenType.bang;
-                    return t;
+                    token.type = TokenType.bang;
+                    return token;
                 }
             },
             '.' => {
                 if (self.peek() == '.') {
-                    t.type = TokenType.range;
-                    t.end = self.position + 2;
+                    token.type = TokenType.range;
+                    token.end = self.position + 2;
                     self.advance();
                 } else {
-                    t.type = TokenType.dot;
-                    return t;
+                    token.type = TokenType.dot;
+                    return token;
                 }
             },
             else => {},
         }
-        return t;
+        return token;
     }
 
     fn is_identifier_start(self: *Lexer) bool {
-        const ch = self.current();
-        return std.ascii.isAlphabetic(ch) or ch == '_';
+        return std.ascii.isAlphabetic(self.current()) or self.current() == '_';
     }
 
     fn is_identifier_continue(self: *Lexer) bool {
-        const ch = self.current();
-        return std.ascii.isAlphanumeric(ch) or ch == '_';
+        return std.ascii.isAlphanumeric(self.current()) or self.current() == '_';
     }
 
     fn read_identifier_token(self: *Lexer) Token {
-        var t = Token{ .type = TokenType.identifier, .start = self.position, .end = self.position };
+        var token = Token{ .type = TokenType.identifier, .start = self.position, .end = self.position };
         while (self.is_identifier_continue()) {
             self.advance();
         }
-        t.end = self.position;
-        if (keywords.get(self.input[t.start..t.end])) |kw| {
-            t.type = kw;
+        token.end = self.position;
+        if (keywords.get(self.input[token.start..token.end])) |keyword| {
+            token.type = keyword;
         }
-        return t;
+        return token;
     }
 
     fn is_digit(self: *Lexer) bool {
-        const ch = self.current();
-        return std.ascii.isDigit(ch);
+        return std.ascii.isDigit(self.current());
     }
 
     fn read_number_token(self: *Lexer) Token {
-        var t = Token{ .type = TokenType.integer, .start = self.position, .end = self.position };
+        var token = Token{ .type = TokenType.integer, .start = self.position, .end = self.position };
         while (self.is_digit()) {
             self.advance();
         }
-        t.end = self.position;
-        return t;
+        token.end = self.position;
+        return token;
     }
 
     fn is_comment_start(self: *Lexer) bool {
@@ -212,8 +209,7 @@ pub const Lexer = struct {
         if (self.position + 1 >= self.input.len) {
             return true;
         }
-        const ch = self.current();
-        return ch == '\n' or ch == '\r';
+        return self.current() == '\n' or self.current() == '\r';
     }
 
     fn eat_comment(self: *Lexer) void {
@@ -256,31 +252,31 @@ pub const Lexer = struct {
                 .end = self.position,
             };
         }
-        var t = Token{
+        var token = Token{
             .type = TokenType.illegal,
             .start = self.position,
             .end = self.position + 1,
         };
         switch (self.current()) {
             '&', '|', '-', '?', ':', ',', '*', '#', '{', '}', '[', ']', '(', ')' => {
-                t = self.read_single_character_token();
+                token = self.read_single_character_token();
             },
             '=', '<', '>', '!', '.' => {
-                t = self.read_lookahead_character_token();
+                token = self.read_lookahead_character_token();
             },
             else => {
                 if (self.is_identifier_start()) {
-                    t = self.read_identifier_token();
-                    return t;
+                    token = self.read_identifier_token();
+                    return token;
                 }
                 if (self.is_digit()) {
-                    t = self.read_number_token();
-                    return t;
+                    token = self.read_number_token();
+                    return token;
                 }
             },
         }
         self.advance();
-        return t;
+        return token;
     }
 };
 

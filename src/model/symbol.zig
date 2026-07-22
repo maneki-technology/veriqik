@@ -55,10 +55,10 @@ pub const Interner = struct {
             try self.name_by_id.append(self.allocator, duped_name);
             errdefer _ = self.name_by_id.pop();
 
-            const symbolId = SymbolId.from_int(@as(u16, @intCast(id)));
-            try self.id_by_name.put(self.allocator, duped_name, symbolId);
+            const symbol_id = SymbolId.from_int(@as(u16, @intCast(id)));
+            try self.id_by_name.put(self.allocator, duped_name, symbol_id);
 
-            return symbolId;
+            return symbol_id;
         };
         return interned;
     }

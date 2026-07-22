@@ -116,15 +116,15 @@ pub const Parser = struct {
         const name = try self.parse_identifier();
         _ = try self.consume(.l_paren);
 
-        var params: ArrayList(ast.Parameter) = .empty;
-        errdefer params.deinit(self.allocator);
-        try self.parse_condition_params(&params);
+        var parameters: ArrayList(ast.Parameter) = .empty;
+        errdefer parameters.deinit(self.allocator);
+        try self.parse_condition_parameters(&parameters);
         _ = try self.consume(.r_paren);
 
         const body = try self.skip_opaque_body();
         return .{
             .name = name,
-            .params = try params.toOwnedSlice(self.allocator),
+            .parameters = try parameters.toOwnedSlice(self.allocator),
             .span = .{
                 .start = condition.start,
                 .end = body.end,
@@ -132,17 +132,17 @@ pub const Parser = struct {
         };
     }
 
-    fn parse_condition_params(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
+    fn parse_condition_parameters(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
         if (self.current_token_is(.r_paren)) return;
 
         while (true) {
-            const param = try self.parse_condition_param();
+            const param = try self.parse_condition_parameter();
             try params.append(self.allocator, param);
             if (!self.match(.comma)) break;
         }
     }
 
-    fn parse_condition_param(self: *Parser) !ast.Parameter {
+    fn parse_condition_parameter(self: *Parser) !ast.Parameter {
         const name = try self.parse_identifier();
         _ = try self.consume(.colon);
         const type_ref = try self.parse_value_type_ref();
@@ -265,8 +265,8 @@ pub const Parser = struct {
     }
 
     fn parse_integer(self: *Parser) !usize {
-        const int_token = try self.consume(.integer);
-        return std.fmt.parseUnsigned(usize, self.lexeme(int_token), 10) catch ParserError.IllegalCharacter;
+        const token = try self.consume(.integer);
+        return std.fmt.parseUnsigned(usize, self.lexeme(token), 10) catch ParserError.IllegalCharacter;
     }
 
     fn parse_permission(_: *Parser) !void {
@@ -413,7 +413,7 @@ fn expect_relation(
     try testing.expectEqual(expected.cardinality, actual.cardinality);
 }
 
-fn expectParameter(
+fn expect_parameter(
     source: []const u8,
     actual: ast.Parameter,
     expected: struct {
@@ -495,7 +495,7 @@ test "parse model with empty condition" {
     try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
     const condition = parsed.model.conditions[0];
     try expect_identifier(source, condition.name, "allow");
-    try testing.expectEqual(@as(usize, 0), condition.params.len);
+    try testing.expectEqual(@as(usize, 0), condition.parameters.len);
     try expect_span_text(source, condition.span, source);
 }
 
@@ -506,8 +506,8 @@ test "parse model with simple condition" {
 
     const condition = parsed.model.conditions[0];
     try expect_identifier(source, condition.name, "allow_ip");
-    try testing.expectEqual(@as(usize, 1), condition.params.len);
-    try expectParameter(source, condition.params[0], .{
+    try testing.expectEqual(@as(usize, 1), condition.parameters.len);
+    try expect_parameter(source, condition.parameters[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress",
@@ -521,8 +521,8 @@ test "parse model with condition with array param" {
     defer parsed.deinit();
 
     const condition = parsed.model.conditions[0];
-    try testing.expectEqual(@as(usize, 1), condition.params.len);
-    try expectParameter(source, condition.params[0], .{
+    try testing.expectEqual(@as(usize, 1), condition.parameters.len);
+    try expect_parameter(source, condition.parameters[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress[]",
@@ -536,13 +536,13 @@ test "parse model with condition with multiple params" {
     defer parsed.deinit();
 
     const condition = parsed.model.conditions[0];
-    try testing.expectEqual(@as(usize, 2), condition.params.len);
-    try expectParameter(source, condition.params[0], .{
+    try testing.expectEqual(@as(usize, 2), condition.parameters.len);
+    try expect_parameter(source, condition.parameters[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress",
     });
-    try expectParameter(source, condition.params[1], .{
+    try expect_parameter(source, condition.parameters[1], .{
         .name = "port",
         .type_name = "Port",
         .declaration = "port: Port",
@@ -566,9 +566,9 @@ test "repeated identifiers share a symbol" {
     var parsed = try TestModel.parse(source);
     defer parsed.deinit();
 
-    const params = parsed.model.conditions[0].params;
-    try testing.expectEqual(@as(usize, 2), params.len);
-    try testing.expectEqual(params[0].type.name.symbol, params[1].type.name.symbol);
+    const parameters = parsed.model.conditions[0].parameters;
+    try testing.expectEqual(@as(usize, 2), parameters.len);
+    try testing.expectEqual(parameters[0].type.name.symbol, parameters[1].type.name.symbol);
 }
 
 test "declaration spans exclude surrounding source" {

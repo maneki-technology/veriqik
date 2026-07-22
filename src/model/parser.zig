@@ -18,6 +18,7 @@ const ParserError = error{
     IllegalCharacter,
     UnexpectedToken,
     ReservedKeyword,
+    CardinalityOverflow,
 };
 
 pub const Parser = struct {
@@ -272,7 +273,7 @@ pub const Parser = struct {
             usize,
             self.lexeme(token),
             10,
-        ) catch ParserError.IllegalCharacter;
+        ) catch ParserError.CardinalityOverflow;
     }
 
     fn parse_permission(_: *Parser) !void {

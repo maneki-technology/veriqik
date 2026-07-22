@@ -24,19 +24,19 @@ pub const Interner = struct {
     allocator: std.mem.Allocator,
     name_by_id: ArrayList,
     id_by_name: Map,
-    symbol_id_max: usize,
+    symbol_count_max: usize,
     identifier_bytes_max: usize,
 
     pub fn init(
         allocator: std.mem.Allocator,
-        symbol_id_max: usize,
+        symbol_count_max: usize,
         identifier_bytes_max: usize,
     ) Interner {
         return .{
             .allocator = allocator,
             .name_by_id = .empty,
             .id_by_name = .empty,
-            .symbol_id_max = symbol_id_max,
+            .symbol_count_max = symbol_count_max,
             .identifier_bytes_max = identifier_bytes_max,
         };
     }
@@ -52,16 +52,16 @@ pub const Interner = struct {
     pub fn intern(self: *Interner, name: []const u8) !SymbolId {
         const interned = self.id_by_name.get(name) orelse {
             const id = self.name_by_id.items.len;
-            if (id > self.symbol_id_max) {
+            if (id >= self.symbol_count_max) {
                 return InternerError.TooManySymbols;
+            }
+
+            if (name.len > self.identifier_bytes_max) {
+                return InternerError.IdentifierTooLong;
             }
 
             const name_owned = try self.allocator.dupe(u8, name);
             errdefer self.allocator.free(name_owned);
-
-            if (name_owned.len > self.identifier_bytes_max) {
-                return InternerError.IdentifierTooLong;
-            }
 
             try self.name_by_id.append(self.allocator, name_owned);
             errdefer _ = self.name_by_id.pop();
@@ -93,7 +93,7 @@ test "interner max symbols" {
     defer interner.deinit();
 
     var i: usize = 0;
-    while (i <= symbol_count_max) : (i += 1) {
+    while (i < symbol_count_max) : (i += 1) {
         const symbol = try std.fmt.allocPrint(allocator, "foo{}", .{i});
         defer allocator.free(symbol);
         _ = try interner.intern(symbol);

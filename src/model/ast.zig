@@ -66,8 +66,8 @@ pub const Model = struct {
             type_decl.deinit(allocator);
         }
         allocator.free(self.types);
-        for (self.conditions) |*cond| {
-            cond.deinit(allocator);
+        for (self.conditions) |*condition| {
+            condition.deinit(allocator);
         }
         allocator.free(self.conditions);
         self.* = undefined;

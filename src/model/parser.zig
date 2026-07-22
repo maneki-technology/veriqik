@@ -63,8 +63,8 @@ pub const Parser = struct {
 
         var conditions: ArrayList(ast.Condition) = .empty;
         errdefer {
-            for (conditions.items) |*cond| {
-                cond.deinit(self.allocator);
+            for (conditions.items) |*condition| {
+                condition.deinit(self.allocator);
             }
             conditions.deinit(self.allocator);
         }

@@ -3,8 +3,8 @@ const token = @import("token.zig");
 const Token = token.Token;
 const TokenType = token.TokenType;
 
-const lexer = @import("lexer.zig");
-const Lexer = lexer.Lexer;
+const lexer_mod = @import("lexer.zig");
+const Lexer = lexer_mod.Lexer;
 
 const ast = @import("ast.zig");
 const ArrayList = std.ArrayList;
@@ -21,66 +21,66 @@ const ParserError = error{
 };
 
 pub const Parser = struct {
-    alloc: std.mem.Allocator,
-    l: Lexer,
-    i: Interner,
-    curr: Token,
-    peek: Token,
+    allocator: std.mem.Allocator,
+    lexer: Lexer,
+    interner: Interner,
+    current_token: Token,
+    peek_token: Token,
     // TODO: diagnostic/error state
 
     pub fn init(allocator: std.mem.Allocator, source: []const u8) Parser {
-        var l = Lexer.init(source);
-        const i = Interner.init(allocator, std.math.maxInt(u16));
-        const curr = l.next();
-        const peek = l.next();
+        var lexer = Lexer.init(source);
+        const interner = Interner.init(allocator, std.math.maxInt(u16));
+        const current_token = lexer.next();
+        const peek_token = lexer.next();
         const parser = Parser{
-            .alloc = allocator,
-            .l = l,
-            .i = i,
-            .curr = curr,
-            .peek = peek,
+            .allocator = allocator,
+            .lexer = lexer,
+            .interner = interner,
+            .current_token = current_token,
+            .peek_token = peek_token,
         };
         return parser;
     }
 
     pub fn deinit(self: *Parser) void {
-        self.i.deinit();
+        self.interner.deinit();
         self.* = undefined;
     }
 
     fn advance(self: *Parser) void {
-        self.curr = self.peek;
-        self.peek = self.l.next();
+        self.current_token = self.peek_token;
+        self.peek_token = self.lexer.next();
     }
 
     pub fn parseModel(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
         errdefer {
             for (types.items) |*type_decl| {
-                type_decl.deinit(self.alloc);
+                type_decl.deinit(self.allocator);
             }
-            types.deinit(self.alloc);
+            types.deinit(self.allocator);
         }
 
         var conditions: ArrayList(ast.Condition) = .empty;
         errdefer {
             for (conditions.items) |*cond| {
-                cond.deinit(self.alloc);
+                cond.deinit(self.allocator);
             }
-            conditions.deinit(self.alloc);
+            conditions.deinit(self.allocator);
         }
 
-        while (!self.currIs(.eof)) {
-            switch (self.curr.type) {
+        while (!self.currentIs(.eof)) {
+            switch (self.current_token.type) {
                 .kw_type => {
                     const type_decl = try self.parseType();
-                    errdefer type_decl.deinit(self.alloc);
-                    try types.append(self.alloc, type_decl);
+                    errdefer type_decl.deinit(self.allocator);
+                    try types.append(self.allocator, type_decl);
                 },
                 .kw_condition => {
                     const condition = try self.parseCondition();
-                    errdefer condition.deinit(self.alloc);
-                    try conditions.append(self.alloc, condition);
+                    errdefer condition.deinit(self.allocator);
+                    try conditions.append(self.allocator, condition);
                 },
                 .illegal => {
                     return ParserError.IllegalCharacter;
@@ -91,17 +91,17 @@ pub const Parser = struct {
             }
         }
 
-        const owned_types = try types.toOwnedSlice(self.alloc);
+        const owned_types = try types.toOwnedSlice(self.allocator);
         errdefer {
             for (owned_types) |*owned_type| {
-                owned_type.deinit(self.alloc);
+                owned_type.deinit(self.allocator);
             }
-            self.alloc.free(owned_types);
+            self.allocator.free(owned_types);
         }
-        const owned_conditions = try conditions.toOwnedSlice(self.alloc);
+        const owned_conditions = try conditions.toOwnedSlice(self.allocator);
         errdefer {
             for (owned_conditions) |*owned_condition| {
-                owned_condition.deinit(self.alloc);
+                owned_condition.deinit(self.allocator);
             }
             self.alloc.free(owned_conditions);
         }
@@ -113,32 +113,32 @@ pub const Parser = struct {
     }
 
     fn parseCondition(self: *Parser) !ast.Condition {
-        const cond = try self.consume(.kw_condition);
+        const condition = try self.consume(.kw_condition);
         const name = try self.parseIdentifier();
         _ = try self.consume(.l_paren);
 
         var params: ArrayList(ast.Parameter) = .empty;
-        errdefer params.deinit(self.alloc);
+        errdefer params.deinit(self.allocator);
         try self.parseConditionParams(&params);
         _ = try self.consume(.r_paren);
 
         const body = try self.skipOpaqueBody();
         return .{
             .name = name,
-            .params = try params.toOwnedSlice(self.alloc),
+            .params = try params.toOwnedSlice(self.allocator),
             .span = .{
-                .start = cond.start,
+                .start = condition.start,
                 .end = body.end,
             },
         };
     }
 
     fn parseConditionParams(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
-        if (self.currIs(.r_paren)) return;
+        if (self.currentIs(.r_paren)) return;
 
         while (true) {
             const param = try self.parseConditionParam();
-            try params.append(self.alloc, param);
+            try params.append(self.allocator, param);
             if (!self.match(.comma)) break;
         }
     }
@@ -146,13 +146,13 @@ pub const Parser = struct {
     fn parseConditionParam(self: *Parser) !ast.Parameter {
         const name = try self.parseIdentifier();
         _ = try self.consume(.colon);
-        const typeRef = try self.parseValueTypeRef();
+        const type_ref = try self.parseValueTypeRef();
         return .{
             .name = name,
-            .type = typeRef,
+            .type = type_ref,
             .span = .{
                 .start = name.span.start,
-                .end = typeRef.span.end,
+                .end = type_ref.span.end,
             },
         };
     }
@@ -160,12 +160,12 @@ pub const Parser = struct {
     fn parseType(self: *Parser) !ast.Type {
         const type_decl = try self.consume(.kw_type);
         const name = try self.parseIdentifier();
-        var bodySpan: ast.Span = undefined;
+        var body_span: ast.Span = undefined;
         var relations: ArrayList(ast.Relation) = .empty;
-        errdefer relations.deinit(self.alloc);
-        try self.parseBody(&bodySpan, &relations);
+        errdefer relations.deinit(self.allocator);
+        try self.parseBody(&body_span, &relations);
 
-        const owned_relations = try relations.toOwnedSlice(self.alloc);
+        const owned_relations = try relations.toOwnedSlice(self.allocator);
         errdefer self.alloc.free(owned_relations);
 
         return .{
@@ -173,15 +173,15 @@ pub const Parser = struct {
             .relations = owned_relations,
             .span = .{
                 .start = type_decl.start,
-                .end = bodySpan.end,
+                .end = body_span.end,
             },
         };
     }
 
     fn parseBody(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
         const opening = try self.consume(.l_brace);
-        while (!self.currIs(.r_brace)) {
-            switch (self.curr.type) {
+        while (!self.currentIs(.r_brace)) {
+            switch (self.current_token.type) {
                 .kw_relation => try self.parseRelation(relations),
                 .kw_permission => try self.parsePermission(),
                 .illegal => return ParserError.IllegalCharacter,
@@ -202,10 +202,10 @@ pub const Parser = struct {
         var cardinality: ?ast.Cardinality = null;
         if (self.match(.l_bracket)) {
             cardinality = .{ .max = null };
-            switch (self.curr.type) {
+            switch (self.current_token.type) {
                 .range => {
                     _ = try self.consume(.range);
-                    if (self.currIs(.integer)) {
+                    if (self.currentIs(.integer)) {
                         cardinality.?.max = try self.parseInteger();
                     }
                     _ = try self.consume(.r_bracket);
@@ -213,7 +213,7 @@ pub const Parser = struct {
                 .integer => {
                     cardinality.?.min = try self.parseInteger();
                     _ = try self.consume(.range);
-                    if (self.currIs(.integer)) {
+                    if (self.currentIs(.integer)) {
                         cardinality.?.max = try self.parseInteger();
                     }
                     _ = try self.consume(.r_bracket);
@@ -225,36 +225,36 @@ pub const Parser = struct {
             return ParserError.UnexpectedToken;
         }
         _ = try self.consume(.colon);
-        var exprSpan: ast.Span = undefined;
-        try self.skipRelationExpression(&exprSpan);
-        try relations.append(self.alloc, .{
+        var expr_span: ast.Span = undefined;
+        try self.skipRelationExpression(&expr_span);
+        try relations.append(self.allocator, .{
             .name = name,
             .cardinality = cardinality,
             .span = .{
                 .start = relation_decl.start,
-                .end = exprSpan.end,
+                .end = expr_span.end,
             },
         });
     }
 
     fn skipRelationExpression(self: *Parser, span: *ast.Span) !void {
         // Empty expression
-        if (self.currIs(.kw_relation) or
-            self.currIs(.kw_permission) or
-            self.currIs(.r_brace) or
-            self.currIs(.eof))
+        if (self.currentIs(.kw_relation) or
+            self.currentIs(.kw_permission) or
+            self.currentIs(.r_brace) or
+            self.currentIs(.eof))
         {
             return ParserError.UnexpectedToken;
         }
 
-        const start = self.curr.start;
-        var end = self.curr.end;
+        const start = self.current_token.start;
+        var end = self.current_token.end;
         while (true) {
-            switch (self.curr.type) {
+            switch (self.current_token.type) {
                 .kw_relation, .kw_permission, .r_brace, .eof => break,
                 .illegal => return ParserError.IllegalCharacter,
                 else => {
-                    end = self.curr.end;
+                    end = self.current_token.end;
                     self.advance();
                 },
             }
@@ -266,8 +266,8 @@ pub const Parser = struct {
     }
 
     fn parseInteger(self: *Parser) !usize {
-        const tok = try self.consume(.integer);
-        return std.fmt.parseUnsigned(usize, self.lexeme(tok), 10) catch ParserError.IllegalCharacter;
+        const int_token = try self.consume(.integer);
+        return std.fmt.parseUnsigned(usize, self.lexeme(int_token), 10) catch ParserError.IllegalCharacter;
     }
 
     fn parsePermission(_: *Parser) !void {
@@ -309,8 +309,8 @@ pub const Parser = struct {
 
     fn skipOpaqueBody(self: *Parser) !ast.Span {
         const opening = try self.consume(.l_brace);
-        while (!self.currIs(.r_brace)) {
-            switch (self.curr.type) {
+        while (!self.currentIs(.r_brace)) {
+            switch (self.current_token.type) {
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
                 else => self.advance(),
@@ -326,39 +326,39 @@ pub const Parser = struct {
 
     // HELPERS
     fn consume(self: *Parser, expected: TokenType) !Token {
-        try self.expectCurr(expected);
-        const consumed = self.curr;
+        try self.expectCurrent(expected);
+        const consumed = self.current_token;
         self.advance();
         return consumed;
     }
 
     fn match(self: *Parser, expected: TokenType) bool {
-        if (!self.currIs(expected)) {
+        if (!self.currentIs(expected)) {
             return false;
         }
         self.advance();
         return true;
     }
 
-    fn currIs(self: *Parser, expected: TokenType) bool {
-        return self.curr.type == expected;
+    fn currentIs(self: *Parser, expected: TokenType) bool {
+        return self.current_token.type == expected;
     }
 
-    fn expectCurr(self: *Parser, expected: TokenType) !void {
-        if (self.currIs(.illegal)) {
+    fn expectCurrent(self: *Parser, expected: TokenType) !void {
+        if (self.currentIs(.illegal)) {
             return ParserError.IllegalCharacter;
         }
-        if (!self.currIs(expected)) {
+        if (!self.currentIs(expected)) {
             return ParserError.UnexpectedToken;
         }
     }
 
     fn lexeme(self: *Parser, t: Token) []const u8 {
-        return self.l.lexeme(t);
+        return self.lexer.lexeme(t);
     }
 
     fn intern(self: *Parser, name: []const u8) !SymbolId {
-        return self.i.intern(name);
+        return self.interner.intern(name);
     }
 };
 
@@ -367,8 +367,8 @@ const TestModel = struct {
     model: ast.Model,
 
     fn parse(source: []const u8) !TestModel {
-        const alloc = testing.allocator;
-        var parser = Parser.init(alloc, source);
+        const allocator = testing.allocator;
+        var parser = Parser.init(allocator, source);
         errdefer parser.deinit();
 
         const model = try parser.parseModel();

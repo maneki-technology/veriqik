@@ -1,6 +1,6 @@
-const token = @import("token.zig");
-const Token = token.Token;
-const TokenType = token.TokenType;
+const token_module = @import("token.zig");
+const Token = token_module.Token;
+const TokenType = token_module.TokenType;
 const std = @import("std");
 const testing = std.testing;
 
@@ -16,107 +16,107 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
 
 pub const Lexer = struct {
     input: []const u8,
-    pos: usize,
+    position: usize,
 
     pub fn init(input: []const u8) Lexer {
         const lexer = Lexer{
             .input = input,
-            .pos = 0,
+            .position = 0,
         };
 
         return lexer;
     }
 
-    fn isAtEnd(self: *Lexer) bool {
-        return self.pos >= self.input.len;
+    fn is_at_end(self: *Lexer) bool {
+        return self.position >= self.input.len;
     }
 
     fn current(self: *Lexer) u8 {
-        if (self.isAtEnd()) {
+        if (self.is_at_end()) {
             return 0;
         }
-        return self.input[self.pos];
+        return self.input[self.position];
     }
 
     fn advance(self: *Lexer) void {
-        if (self.isAtEnd()) {
+        if (self.is_at_end()) {
             return;
         }
-        self.pos += 1;
+        self.position += 1;
     }
 
-    fn readSingleCharToken(self: *Lexer) Token {
-        var t = Token{
+    fn read_single_character_token(self: *Lexer) Token {
+        var token = Token{
             .type = TokenType.illegal,
-            .start = self.pos,
-            .end = self.pos + 1,
+            .start = self.position,
+            .end = self.position + 1,
         };
         switch (self.current()) {
             '&' => {
-                t.type = TokenType.ampersand;
+                token.type = TokenType.ampersand;
             },
             '|' => {
-                t.type = TokenType.pipe;
+                token.type = TokenType.pipe;
             },
             '-' => {
-                t.type = TokenType.minus;
+                token.type = TokenType.minus;
             },
             '?' => {
-                t.type = TokenType.question;
+                token.type = TokenType.question;
             },
             ':' => {
-                t.type = TokenType.colon;
+                token.type = TokenType.colon;
             },
             ',' => {
-                t.type = TokenType.comma;
+                token.type = TokenType.comma;
             },
             '*' => {
-                t.type = TokenType.star;
+                token.type = TokenType.star;
             },
             '#' => {
-                t.type = TokenType.hash;
+                token.type = TokenType.hash;
             },
             '{' => {
-                t.type = TokenType.l_brace;
+                token.type = TokenType.l_brace;
             },
             '}' => {
-                t.type = TokenType.r_brace;
+                token.type = TokenType.r_brace;
             },
             '[' => {
-                t.type = TokenType.l_bracket;
+                token.type = TokenType.l_bracket;
             },
             ']' => {
-                t.type = TokenType.r_bracket;
+                token.type = TokenType.r_bracket;
             },
             '(' => {
-                t.type = TokenType.l_paren;
+                token.type = TokenType.l_paren;
             },
             ')' => {
-                t.type = TokenType.r_paren;
+                token.type = TokenType.r_paren;
             },
             else => {},
         }
-        return t;
+        return token;
     }
 
     fn peek(self: *Lexer) u8 {
-        if (self.pos + 1 >= self.input.len) {
+        if (self.position + 1 >= self.input.len) {
             return 0;
         }
-        return self.input[self.pos + 1];
+        return self.input[self.position + 1];
     }
 
-    fn readLookaheadCharToken(self: *Lexer) Token {
+    fn read_lookahead_character_token(self: *Lexer) Token {
         var t = Token{
             .type = TokenType.illegal,
-            .start = self.pos,
-            .end = self.pos + 1,
+            .start = self.position,
+            .end = self.position + 1,
         };
         switch (self.current()) {
             '=' => {
                 if (self.peek() == '=') {
                     t.type = TokenType.equal_equal;
-                    t.end = self.pos + 2;
+                    t.end = self.position + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.assign;
@@ -126,7 +126,7 @@ pub const Lexer = struct {
             '<' => {
                 if (self.peek() == '=') {
                     t.type = TokenType.less_equal;
-                    t.end = self.pos + 2;
+                    t.end = self.position + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.less;
@@ -136,7 +136,7 @@ pub const Lexer = struct {
             '>' => {
                 if (self.peek() == '=') {
                     t.type = TokenType.greater_equal;
-                    t.end = self.pos + 2;
+                    t.end = self.position + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.greater;
@@ -146,7 +146,7 @@ pub const Lexer = struct {
             '!' => {
                 if (self.peek() == '=') {
                     t.type = TokenType.bang_equal;
-                    t.end = self.pos + 2;
+                    t.end = self.position + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.bang;
@@ -156,7 +156,7 @@ pub const Lexer = struct {
             '.' => {
                 if (self.peek() == '.') {
                     t.type = TokenType.range;
-                    t.end = self.pos + 2;
+                    t.end = self.position + 2;
                     self.advance();
                 } else {
                     t.type = TokenType.dot;
@@ -168,74 +168,74 @@ pub const Lexer = struct {
         return t;
     }
 
-    fn isIdenStart(self: *Lexer) bool {
+    fn is_identifier_start(self: *Lexer) bool {
         const ch = self.current();
         return std.ascii.isAlphabetic(ch) or ch == '_';
     }
 
-    fn isIdenContinue(self: *Lexer) bool {
+    fn is_identifier_continue(self: *Lexer) bool {
         const ch = self.current();
         return std.ascii.isAlphanumeric(ch) or ch == '_';
     }
 
-    fn readIdentifierToken(self: *Lexer) Token {
-        var t = Token{ .type = TokenType.identifier, .start = self.pos, .end = self.pos };
-        while (self.isIdenContinue()) {
+    fn read_identifier_token(self: *Lexer) Token {
+        var t = Token{ .type = TokenType.identifier, .start = self.position, .end = self.position };
+        while (self.is_identifier_continue()) {
             self.advance();
         }
-        t.end = self.pos;
+        t.end = self.position;
         if (keywords.get(self.input[t.start..t.end])) |kw| {
             t.type = kw;
         }
         return t;
     }
 
-    fn isDigit(self: *Lexer) bool {
+    fn is_digit(self: *Lexer) bool {
         const ch = self.current();
         return std.ascii.isDigit(ch);
     }
 
-    fn readNumberToken(self: *Lexer) Token {
-        var t = Token{ .type = TokenType.integer, .start = self.pos, .end = self.pos };
-        while (self.isDigit()) {
+    fn read_number_token(self: *Lexer) Token {
+        var t = Token{ .type = TokenType.integer, .start = self.position, .end = self.position };
+        while (self.is_digit()) {
             self.advance();
         }
-        t.end = self.pos;
+        t.end = self.position;
         return t;
     }
 
-    fn isCommentStart(self: *Lexer) bool {
+    fn is_comment_start(self: *Lexer) bool {
         return self.peek() == '/' and self.current() == '/';
     }
 
-    fn isCommentEnd(self: *Lexer) bool {
-        if (self.pos + 1 >= self.input.len) {
+    fn is_comment_end(self: *Lexer) bool {
+        if (self.position + 1 >= self.input.len) {
             return true;
         }
         const ch = self.current();
         return ch == '\n' or ch == '\r';
     }
 
-    fn eatComment(self: *Lexer) void {
-        while (!self.isCommentEnd()) {
+    fn eat_comment(self: *Lexer) void {
+        while (!self.is_comment_end()) {
             self.advance();
         }
         self.advance();
     }
 
-    fn eatWhitespace(self: *Lexer) void {
+    fn eat_whitespace(self: *Lexer) void {
         while (std.ascii.isWhitespace(self.current())) {
             self.advance();
         }
     }
 
-    fn eatTrivia(self: *Lexer) void {
+    fn eat_trivia(self: *Lexer) void {
         while (true) {
-            self.eatWhitespace();
-            if (!self.isCommentStart()) {
+            self.eat_whitespace();
+            if (!self.is_comment_start()) {
                 return;
             }
-            self.eatComment();
+            self.eat_comment();
         }
     }
 
@@ -248,33 +248,33 @@ pub const Lexer = struct {
     }
 
     pub fn next(self: *Lexer) Token {
-        self.eatTrivia();
-        if (self.isAtEnd()) {
+        self.eat_trivia();
+        if (self.is_at_end()) {
             return Token{
                 .type = TokenType.eof,
-                .start = self.pos,
-                .end = self.pos,
+                .start = self.position,
+                .end = self.position,
             };
         }
         var t = Token{
             .type = TokenType.illegal,
-            .start = self.pos,
-            .end = self.pos + 1,
+            .start = self.position,
+            .end = self.position + 1,
         };
         switch (self.current()) {
             '&', '|', '-', '?', ':', ',', '*', '#', '{', '}', '[', ']', '(', ')' => {
-                t = self.readSingleCharToken();
+                t = self.read_single_character_token();
             },
             '=', '<', '>', '!', '.' => {
-                t = self.readLookaheadCharToken();
+                t = self.read_lookahead_character_token();
             },
             else => {
-                if (self.isIdenStart()) {
-                    t = self.readIdentifierToken();
+                if (self.is_identifier_start()) {
+                    t = self.read_identifier_token();
                     return t;
                 }
-                if (self.isDigit()) {
-                    t = self.readNumberToken();
+                if (self.is_digit()) {
+                    t = self.read_number_token();
                     return t;
                 }
             },
@@ -289,7 +289,7 @@ const ExpectedToken = struct {
     lexeme: []const u8,
 };
 
-fn expectTokens(input: []const u8, expected: []const ExpectedToken) !void {
+fn expect_tokens(input: []const u8, expected: []const ExpectedToken) !void {
     try testing.expect(expected.len > 0);
     try testing.expectEqual(TokenType.eof, expected[expected.len - 1].type);
 
@@ -317,7 +317,7 @@ test "single character tokens" {
         .{ .type = .l_paren, .lexeme = "(" },   .{ .type = .r_paren, .lexeme = ")" },
         .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "lookahead tokens" {
@@ -330,7 +330,7 @@ test "lookahead tokens" {
         .{ .type = .dot, .lexeme = "." },         .{ .type = .bang, .lexeme = "!" },
         .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "lookahead tokens same first char consecutive" {
@@ -342,7 +342,7 @@ test "lookahead tokens same first char consecutive" {
         .{ .type = .range, .lexeme = ".." },       .{ .type = .dot, .lexeme = "." },
         .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "keywords" {
@@ -353,7 +353,7 @@ test "keywords" {
         .{ .type = .kw_with, .lexeme = "with" },             .{ .type = .kw_in, .lexeme = "in" },
         .{ .type = .kw_self, .lexeme = "self" },             .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "identifiers" {
@@ -363,7 +363,7 @@ test "identifiers" {
         .{ .type = .identifier, .lexeme = "baz" },  .{ .type = .identifier, .lexeme = "foo_bar" },
         .{ .type = .identifier, .lexeme = "foo1" }, .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "integers" {
@@ -372,13 +372,13 @@ test "integers" {
         .{ .type = .integer, .lexeme = "0" },          .{ .type = .integer, .lexeme = "1" },
         .{ .type = .integer, .lexeme = "1234567890" }, .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "comments" {
     const input = "// this is a comment\n// this is another comment\r// this is yet another comment\r\n";
     const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "illegal characters" {
@@ -388,7 +388,7 @@ test "illegal characters" {
         .{ .type = .illegal, .lexeme = "@" },  .{ .type = .illegal, .lexeme = "$" },
         .{ .type = .illegal, .lexeme = "%" },  .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "embedded null" {
@@ -401,7 +401,7 @@ test "embedded null" {
         .{ .type = .illegal, .lexeme = "\x00" },
         .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "simple type with cardinality bounds and comments" {
@@ -429,7 +429,7 @@ test "simple type with cardinality bounds and comments" {
         .{ .type = .assign, .lexeme = "=" },                 .{ .type = .identifier, .lexeme = "member" },
         .{ .type = .r_brace, .lexeme = "}" },                .{ .type = .eof, .lexeme = "" },
     };
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }
 
 test "full model" {
@@ -554,5 +554,5 @@ test "full model" {
         .{ .type = .eof, .lexeme = "" },
     };
 
-    try expectTokens(input, &expected);
+    try expect_tokens(input, &expected);
 }

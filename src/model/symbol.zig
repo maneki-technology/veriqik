@@ -6,11 +6,11 @@ const testing = std.testing;
 pub const SymbolId = enum(u16) {
     _,
 
-    pub fn fromInt(value: u16) SymbolId {
+    pub fn from_int(value: u16) SymbolId {
         return @enumFromInt(value);
     }
 
-    pub fn toInt(self: SymbolId) u16 {
+    pub fn to_int(self: SymbolId) u16 {
         return @intFromEnum(self);
     }
 };
@@ -55,7 +55,7 @@ pub const Interner = struct {
             try self.name_by_id.append(self.allocator, duped_name);
             errdefer _ = self.name_by_id.pop();
 
-            const symbolId = SymbolId.fromInt(@as(u16, @intCast(id)));
+            const symbolId = SymbolId.from_int(@as(u16, @intCast(id)));
             try self.id_by_name.put(self.allocator, duped_name, symbolId);
 
             return symbolId;
@@ -68,10 +68,10 @@ test "interner" {
     var interner = Interner.init(std.testing.allocator, std.math.maxInt(u16));
     defer interner.deinit();
 
-    try testing.expectEqual(SymbolId.fromInt(0), try interner.intern("foo"));
-    try testing.expectEqual(SymbolId.fromInt(1), try interner.intern("bar"));
-    try testing.expectEqual(SymbolId.fromInt(0), try interner.intern("foo"));
-    try testing.expectEqual(SymbolId.fromInt(1), try interner.intern("bar"));
+    try testing.expectEqual(SymbolId.from_int(0), try interner.intern("foo"));
+    try testing.expectEqual(SymbolId.from_int(1), try interner.intern("bar"));
+    try testing.expectEqual(SymbolId.from_int(0), try interner.intern("foo"));
+    try testing.expectEqual(SymbolId.from_int(1), try interner.intern("bar"));
 }
 
 test "interner max symbols" {

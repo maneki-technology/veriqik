@@ -24,21 +24,21 @@ pub const Parser = struct {
     allocator: std.mem.Allocator,
     lexer: Lexer,
     interner: Interner,
-    current_token: Token,
-    peek_token: Token,
+    token_current: Token,
+    token_peek: Token,
     // TODO: diagnostic/error state
 
     pub fn init(allocator: std.mem.Allocator, source: []const u8) Parser {
         var lexer = Lexer.init(source);
         const interner = Interner.init(allocator, std.math.maxInt(u16));
-        const current_token = lexer.next();
-        const peek_token = lexer.next();
+        const token_current = lexer.next();
+        const token_peek = lexer.next();
         return .{
             .allocator = allocator,
             .lexer = lexer,
             .interner = interner,
-            .current_token = current_token,
-            .peek_token = peek_token,
+            .token_current = token_current,
+            .token_peek = token_peek,
         };
     }
 
@@ -48,8 +48,8 @@ pub const Parser = struct {
     }
 
     fn advance(self: *Parser) void {
-        self.current_token = self.peek_token;
-        self.peek_token = self.lexer.next();
+        self.token_current = self.token_peek;
+        self.token_peek = self.lexer.next();
     }
 
     pub fn parse_model(self: *Parser) !ast.Model {
@@ -70,7 +70,7 @@ pub const Parser = struct {
         }
 
         while (!self.current_token_is(.eof)) {
-            switch (self.current_token.type) {
+            switch (self.token_current.type) {
                 .kw_type => {
                     const type_decl = try self.parse_type();
                     errdefer type_decl.deinit(self.allocator);
@@ -180,7 +180,7 @@ pub const Parser = struct {
     fn parse_type_body(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
         const opening = try self.consume(.l_brace);
         while (!self.current_token_is(.r_brace)) {
-            switch (self.current_token.type) {
+            switch (self.token_current.type) {
                 .kw_relation => try self.parse_relation(relations),
                 .kw_permission => try self.parse_permission(),
                 .illegal => return ParserError.IllegalCharacter,
@@ -201,7 +201,7 @@ pub const Parser = struct {
         var cardinality: ?ast.Cardinality = null;
         if (self.match(.l_bracket)) {
             cardinality = .{ .max = null };
-            switch (self.current_token.type) {
+            switch (self.token_current.type) {
                 .range => {
                     _ = try self.consume(.range);
                     if (self.current_token_is(.integer)) {
@@ -246,14 +246,14 @@ pub const Parser = struct {
             return ParserError.UnexpectedToken;
         }
 
-        const start = self.current_token.start;
-        var end = self.current_token.end;
+        const start = self.token_current.start;
+        var end = self.token_current.end;
         while (true) {
-            switch (self.current_token.type) {
+            switch (self.token_current.type) {
                 .kw_relation, .kw_permission, .r_brace, .eof => break,
                 .illegal => return ParserError.IllegalCharacter,
                 else => {
-                    end = self.current_token.end;
+                    end = self.token_current.end;
                     self.advance();
                 },
             }
@@ -309,7 +309,7 @@ pub const Parser = struct {
     fn skip_opaque_body(self: *Parser) !ast.Span {
         const opening = try self.consume(.l_brace);
         while (!self.current_token_is(.r_brace)) {
-            switch (self.current_token.type) {
+            switch (self.token_current.type) {
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
                 else => self.advance(),
@@ -326,7 +326,7 @@ pub const Parser = struct {
     // HELPERS
     fn consume(self: *Parser, expected: TokenType) !Token {
         try self.expect_current_token(expected);
-        const consumed = self.current_token;
+        const consumed = self.token_current;
         self.advance();
         return consumed;
     }
@@ -340,7 +340,7 @@ pub const Parser = struct {
     }
 
     fn current_token_is(self: *Parser, expected: TokenType) bool {
-        return self.current_token.type == expected;
+        return self.token_current.type == expected;
     }
 
     fn expect_current_token(self: *Parser, expected: TokenType) !void {

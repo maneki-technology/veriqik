@@ -15,22 +15,34 @@ pub const SymbolId = enum(u16) {
     }
 };
 
+pub const symbol_count_capacity: usize =
+    @as(usize, std.math.maxInt(u16)) + 1;
+
 const InternerError = error{
     TooManySymbols,
+    IdentifierTooLong,
 };
 
 pub const Interner = struct {
     allocator: std.mem.Allocator,
     name_by_id: ArrayList,
     id_by_name: Map,
-    symbol_id_max: usize,
+    symbol_count_max: usize,
+    identifier_bytes_max: usize,
 
-    pub fn init(allocator: std.mem.Allocator, symbol_id_max: usize) Interner {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        symbol_count_max: usize,
+        identifier_bytes_max: usize,
+    ) Interner {
+        std.debug.assert(symbol_count_max <= symbol_count_capacity);
+
         return .{
             .allocator = allocator,
             .name_by_id = .empty,
             .id_by_name = .empty,
-            .symbol_id_max = symbol_id_max,
+            .symbol_count_max = symbol_count_max,
+            .identifier_bytes_max = identifier_bytes_max,
         };
     }
 
@@ -45,8 +57,12 @@ pub const Interner = struct {
     pub fn intern(self: *Interner, name: []const u8) !SymbolId {
         const interned = self.id_by_name.get(name) orelse {
             const id = self.name_by_id.items.len;
-            if (id > self.symbol_id_max) {
+            if (id >= self.symbol_count_max) {
                 return InternerError.TooManySymbols;
+            }
+
+            if (name.len > self.identifier_bytes_max) {
+                return InternerError.IdentifierTooLong;
             }
 
             const name_owned = try self.allocator.dupe(u8, name);
@@ -65,7 +81,7 @@ pub const Interner = struct {
 };
 
 test "interner" {
-    var interner = Interner.init(std.testing.allocator, std.math.maxInt(u16));
+    var interner = Interner.init(std.testing.allocator, std.math.maxInt(u16), 255);
     defer interner.deinit();
 
     try testing.expectEqual(SymbolId.from_int(0), try interner.intern("foo"));
@@ -76,15 +92,24 @@ test "interner" {
 
 test "interner max symbols" {
     const allocator = std.testing.allocator;
-    const limit = 8;
-    var interner = Interner.init(allocator, limit);
+    const symbol_count_max = 8;
+    const identifier_bytes_max = 255;
+    var interner = Interner.init(allocator, symbol_count_max, identifier_bytes_max);
     defer interner.deinit();
 
     var i: usize = 0;
-    while (i <= limit) : (i += 1) {
+    while (i < symbol_count_max) : (i += 1) {
         const symbol = try std.fmt.allocPrint(allocator, "foo{}", .{i});
         defer allocator.free(symbol);
         _ = try interner.intern(symbol);
     }
     try testing.expectError(InternerError.TooManySymbols, interner.intern("foo"));
+}
+
+test "interner max identifier bytes" {
+    var interner = Interner.init(testing.allocator, 8, 3);
+    defer interner.deinit();
+
+    try testing.expectEqual(SymbolId.from_int(0), try interner.intern("foo"));
+    try testing.expectError(InternerError.IdentifierTooLong, interner.intern("fooo"));
 }

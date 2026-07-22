@@ -1,18 +1,18 @@
 const std = @import("std");
-const token = @import("token.zig");
-const Token = token.Token;
-const TokenType = token.TokenType;
+const token_module = @import("token.zig");
+const Token = token_module.Token;
+const TokenType = token_module.TokenType;
 
-const lexer_mod = @import("lexer.zig");
-const Lexer = lexer_mod.Lexer;
+const lexer_module = @import("lexer.zig");
+const Lexer = lexer_module.Lexer;
 
 const ast = @import("ast.zig");
 const ArrayList = std.ArrayList;
 const testing = std.testing;
 
-const symbol = @import("symbol.zig");
-const SymbolId = symbol.SymbolId;
-const Interner = symbol.Interner;
+const symbol_module = @import("symbol.zig");
+const SymbolId = symbol_module.SymbolId;
+const Interner = symbol_module.Interner;
 
 const ParserError = error{
     IllegalCharacter,
@@ -52,7 +52,7 @@ pub const Parser = struct {
         self.peek_token = self.lexer.next();
     }
 
-    pub fn parseModel(self: *Parser) !ast.Model {
+    pub fn parse_model(self: *Parser) !ast.Model {
         var types: ArrayList(ast.Type) = .empty;
         errdefer {
             for (types.items) |*type_decl| {
@@ -69,15 +69,15 @@ pub const Parser = struct {
             conditions.deinit(self.allocator);
         }
 
-        while (!self.currentIs(.eof)) {
+        while (!self.current_token_is(.eof)) {
             switch (self.current_token.type) {
                 .kw_type => {
-                    const type_decl = try self.parseType();
+                    const type_decl = try self.parse_type();
                     errdefer type_decl.deinit(self.allocator);
                     try types.append(self.allocator, type_decl);
                 },
                 .kw_condition => {
-                    const condition = try self.parseCondition();
+                    const condition = try self.parse_condition();
                     errdefer condition.deinit(self.allocator);
                     try conditions.append(self.allocator, condition);
                 },
@@ -102,7 +102,7 @@ pub const Parser = struct {
             for (owned_conditions) |*owned_condition| {
                 owned_condition.deinit(self.allocator);
             }
-            self.alloc.free(owned_conditions);
+            self.allocator.free(owned_conditions);
         }
 
         return .{
@@ -111,17 +111,17 @@ pub const Parser = struct {
         };
     }
 
-    fn parseCondition(self: *Parser) !ast.Condition {
+    fn parse_condition(self: *Parser) !ast.Condition {
         const condition = try self.consume(.kw_condition);
-        const name = try self.parseIdentifier();
+        const name = try self.parse_identifier();
         _ = try self.consume(.l_paren);
 
         var params: ArrayList(ast.Parameter) = .empty;
         errdefer params.deinit(self.allocator);
-        try self.parseConditionParams(&params);
+        try self.parse_condition_params(&params);
         _ = try self.consume(.r_paren);
 
-        const body = try self.skipOpaqueBody();
+        const body = try self.skip_opaque_body();
         return .{
             .name = name,
             .params = try params.toOwnedSlice(self.allocator),
@@ -132,20 +132,20 @@ pub const Parser = struct {
         };
     }
 
-    fn parseConditionParams(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
-        if (self.currentIs(.r_paren)) return;
+    fn parse_condition_params(self: *Parser, params: *ArrayList(ast.Parameter)) !void {
+        if (self.current_token_is(.r_paren)) return;
 
         while (true) {
-            const param = try self.parseConditionParam();
+            const param = try self.parse_condition_param();
             try params.append(self.allocator, param);
             if (!self.match(.comma)) break;
         }
     }
 
-    fn parseConditionParam(self: *Parser) !ast.Parameter {
-        const name = try self.parseIdentifier();
+    fn parse_condition_param(self: *Parser) !ast.Parameter {
+        const name = try self.parse_identifier();
         _ = try self.consume(.colon);
-        const type_ref = try self.parseValueTypeRef();
+        const type_ref = try self.parse_value_type_ref();
         return .{
             .name = name,
             .type = type_ref,
@@ -156,16 +156,16 @@ pub const Parser = struct {
         };
     }
 
-    fn parseType(self: *Parser) !ast.Type {
+    fn parse_type(self: *Parser) !ast.Type {
         const type_decl = try self.consume(.kw_type);
-        const name = try self.parseIdentifier();
+        const name = try self.parse_identifier();
         var body_span: ast.Span = undefined;
         var relations: ArrayList(ast.Relation) = .empty;
         errdefer relations.deinit(self.allocator);
-        try self.parseBody(&body_span, &relations);
+        try self.parse_type_body(&body_span, &relations);
 
         const owned_relations = try relations.toOwnedSlice(self.allocator);
-        errdefer self.alloc.free(owned_relations);
+        errdefer self.allocator.free(owned_relations);
 
         return .{
             .name = name,
@@ -177,12 +177,12 @@ pub const Parser = struct {
         };
     }
 
-    fn parseBody(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
+    fn parse_type_body(self: *Parser, span: *ast.Span, relations: *ArrayList(ast.Relation)) !void {
         const opening = try self.consume(.l_brace);
-        while (!self.currentIs(.r_brace)) {
+        while (!self.current_token_is(.r_brace)) {
             switch (self.current_token.type) {
-                .kw_relation => try self.parseRelation(relations),
-                .kw_permission => try self.parsePermission(),
+                .kw_relation => try self.parse_relation(relations),
+                .kw_permission => try self.parse_permission(),
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
                 else => return ParserError.UnexpectedToken,
@@ -195,25 +195,25 @@ pub const Parser = struct {
         };
     }
 
-    fn parseRelation(self: *Parser, relations: *ArrayList(ast.Relation)) !void {
+    fn parse_relation(self: *Parser, relations: *ArrayList(ast.Relation)) !void {
         const relation_decl = try self.consume(.kw_relation);
-        const name = try self.parseIdentifier();
+        const name = try self.parse_identifier();
         var cardinality: ?ast.Cardinality = null;
         if (self.match(.l_bracket)) {
             cardinality = .{ .max = null };
             switch (self.current_token.type) {
                 .range => {
                     _ = try self.consume(.range);
-                    if (self.currentIs(.integer)) {
-                        cardinality.?.max = try self.parseInteger();
+                    if (self.current_token_is(.integer)) {
+                        cardinality.?.max = try self.parse_integer();
                     }
                     _ = try self.consume(.r_bracket);
                 },
                 .integer => {
-                    cardinality.?.min = try self.parseInteger();
+                    cardinality.?.min = try self.parse_integer();
                     _ = try self.consume(.range);
-                    if (self.currentIs(.integer)) {
-                        cardinality.?.max = try self.parseInteger();
+                    if (self.current_token_is(.integer)) {
+                        cardinality.?.max = try self.parse_integer();
                     }
                     _ = try self.consume(.r_bracket);
                 },
@@ -225,7 +225,7 @@ pub const Parser = struct {
         }
         _ = try self.consume(.colon);
         var expr_span: ast.Span = undefined;
-        try self.skipRelationExpression(&expr_span);
+        try self.skip_relation_expression(&expr_span);
         try relations.append(self.allocator, .{
             .name = name,
             .cardinality = cardinality,
@@ -236,12 +236,12 @@ pub const Parser = struct {
         });
     }
 
-    fn skipRelationExpression(self: *Parser, span: *ast.Span) !void {
+    fn skip_relation_expression(self: *Parser, span: *ast.Span) !void {
         // Empty expression
-        if (self.currentIs(.kw_relation) or
-            self.currentIs(.kw_permission) or
-            self.currentIs(.r_brace) or
-            self.currentIs(.eof))
+        if (self.current_token_is(.kw_relation) or
+            self.current_token_is(.kw_permission) or
+            self.current_token_is(.r_brace) or
+            self.current_token_is(.eof))
         {
             return ParserError.UnexpectedToken;
         }
@@ -264,29 +264,29 @@ pub const Parser = struct {
         };
     }
 
-    fn parseInteger(self: *Parser) !usize {
+    fn parse_integer(self: *Parser) !usize {
         const int_token = try self.consume(.integer);
         return std.fmt.parseUnsigned(usize, self.lexeme(int_token), 10) catch ParserError.IllegalCharacter;
     }
 
-    fn parsePermission(_: *Parser) !void {
+    fn parse_permission(_: *Parser) !void {
         return ParserError.ReservedKeyword;
     }
 
-    fn parseIdentifier(self: *Parser) !ast.Identifier {
-        const tok = try self.consume(.identifier);
-        const s = try self.intern(self.lexeme(tok));
+    fn parse_identifier(self: *Parser) !ast.Identifier {
+        const identifier = try self.consume(.identifier);
+        const symbol = try self.intern(self.lexeme(identifier));
         return .{
-            .symbol = s,
+            .symbol = symbol,
             .span = .{
-                .start = tok.start,
-                .end = tok.end,
+                .start = identifier.start,
+                .end = identifier.end,
             },
         };
     }
 
-    fn parseValueTypeRef(self: *Parser) !ast.ValueTypeRef {
-        const name = try self.parseIdentifier();
+    fn parse_value_type_ref(self: *Parser) !ast.ValueTypeRef {
+        const name = try self.parse_identifier();
         var end = name.span.end;
         var collection = false;
         if (self.match(.l_bracket)) {
@@ -306,9 +306,9 @@ pub const Parser = struct {
         };
     }
 
-    fn skipOpaqueBody(self: *Parser) !ast.Span {
+    fn skip_opaque_body(self: *Parser) !ast.Span {
         const opening = try self.consume(.l_brace);
-        while (!self.currentIs(.r_brace)) {
+        while (!self.current_token_is(.r_brace)) {
             switch (self.current_token.type) {
                 .illegal => return ParserError.IllegalCharacter,
                 .eof => return ParserError.UnexpectedToken,
@@ -325,29 +325,29 @@ pub const Parser = struct {
 
     // HELPERS
     fn consume(self: *Parser, expected: TokenType) !Token {
-        try self.expectCurrent(expected);
+        try self.expect_current_token(expected);
         const consumed = self.current_token;
         self.advance();
         return consumed;
     }
 
     fn match(self: *Parser, expected: TokenType) bool {
-        if (!self.currentIs(expected)) {
+        if (!self.current_token_is(expected)) {
             return false;
         }
         self.advance();
         return true;
     }
 
-    fn currentIs(self: *Parser, expected: TokenType) bool {
+    fn current_token_is(self: *Parser, expected: TokenType) bool {
         return self.current_token.type == expected;
     }
 
-    fn expectCurrent(self: *Parser, expected: TokenType) !void {
-        if (self.currentIs(.illegal)) {
+    fn expect_current_token(self: *Parser, expected: TokenType) !void {
+        if (self.current_token_is(.illegal)) {
             return ParserError.IllegalCharacter;
         }
-        if (!self.currentIs(expected)) {
+        if (!self.current_token_is(expected)) {
             return ParserError.UnexpectedToken;
         }
     }
@@ -370,7 +370,7 @@ const TestModel = struct {
         var parser = Parser.init(allocator, source);
         errdefer parser.deinit();
 
-        const model = try parser.parseModel();
+        const model = try parser.parse_model();
         return .{
             .parser = parser,
             .model = model,
@@ -438,7 +438,7 @@ fn expectParameter(
 fn expectParseError(expected: anyerror, source: []const u8) !void {
     var parser = Parser.init(testing.allocator, source);
     defer parser.deinit();
-    var model = parser.parseModel() catch |err| {
+    var model = parser.parse_model() catch |err| {
         try testing.expectEqual(expected, err);
         return;
     };

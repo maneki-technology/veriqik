@@ -383,13 +383,13 @@ const TestModel = struct {
     }
 };
 
-fn expectSpanText(source: []const u8, span: ast.Span, expected: []const u8) !void {
+fn expect_span_text(source: []const u8, span: ast.Span, expected: []const u8) !void {
     try testing.expect(span.start <= span.end);
     try testing.expect(span.end <= source.len);
     try testing.expectEqualStrings(expected, source[span.start..span.end]);
 }
 
-fn expectExactSpan(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
+fn expect_exact_span(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
     const start = std.mem.indexOf(u8, source, expected_text).?;
     try testing.expectEqual(ast.Span{
         .start = start,
@@ -397,11 +397,11 @@ fn expectExactSpan(source: []const u8, actual: ast.Span, expected_text: []const 
     }, actual);
 }
 
-fn expectIdentifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
-    try expectSpanText(source, actual.span, expected);
+fn expect_identifier(source: []const u8, actual: ast.Identifier, expected: []const u8) !void {
+    try expect_span_text(source, actual.span, expected);
 }
 
-fn expectRelation(
+fn expect_relation(
     source: []const u8,
     actual: ast.Relation,
     expected: struct {
@@ -409,7 +409,7 @@ fn expectRelation(
         cardinality: ?ast.Cardinality,
     },
 ) !void {
-    try expectIdentifier(source, actual.name, expected.name);
+    try expect_identifier(source, actual.name, expected.name);
     try testing.expectEqual(expected.cardinality, actual.cardinality);
 }
 
@@ -423,11 +423,11 @@ fn expectParameter(
         collection: bool = false,
     },
 ) !void {
-    try expectIdentifier(source, actual.name, expected.name);
-    try expectIdentifier(source, actual.type.name, expected.type_name);
-    try expectSpanText(source, actual.span, expected.declaration);
+    try expect_identifier(source, actual.name, expected.name);
+    try expect_identifier(source, actual.type.name, expected.type_name);
+    try expect_span_text(source, actual.span, expected.declaration);
     const type_start = std.mem.indexOf(u8, expected.declaration, expected.type_name).?;
-    try expectSpanText(
+    try expect_span_text(
         source,
         actual.type.span,
         expected.declaration[type_start..],
@@ -435,7 +435,7 @@ fn expectParameter(
     try testing.expectEqual(expected.collection, actual.type.collection);
 }
 
-fn expectParseError(expected: anyerror, source: []const u8) !void {
+fn expect_parse_error(expected: anyerror, source: []const u8) !void {
     var parser = Parser.init(testing.allocator, source);
     defer parser.deinit();
     var model = parser.parse_model() catch |err| {
@@ -453,8 +453,8 @@ test "parse model with simple type" {
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
     try testing.expectEqual(@as(usize, 0), parsed.model.conditions.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "User");
-    try expectSpanText(source, parsed.model.types[0].span, source);
+    try expect_identifier(source, parsed.model.types[0].name, "User");
+    try expect_span_text(source, parsed.model.types[0].span, source);
 }
 
 test "parse model with type with body" {
@@ -467,20 +467,20 @@ test "parse model with type with body" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
-    try expectSpanText(source, parsed.model.types[0].span, source);
+    try expect_span_text(source, parsed.model.types[0].span, source);
 }
 
 test "parse model with type with illegal character" {
-    try expectParseError(ParserError.IllegalCharacter, "type User { @ }");
+    try expect_parse_error(ParserError.IllegalCharacter, "type User { @ }");
 }
 
 test "parse model with type missing closing brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10]: User",
     );
@@ -494,9 +494,9 @@ test "parse model with empty condition" {
     try testing.expectEqual(@as(usize, 0), parsed.model.types.len);
     try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
     const condition = parsed.model.conditions[0];
-    try expectIdentifier(source, condition.name, "allow");
+    try expect_identifier(source, condition.name, "allow");
     try testing.expectEqual(@as(usize, 0), condition.params.len);
-    try expectSpanText(source, condition.span, source);
+    try expect_span_text(source, condition.span, source);
 }
 
 test "parse model with simple condition" {
@@ -505,14 +505,14 @@ test "parse model with simple condition" {
     defer parsed.deinit();
 
     const condition = parsed.model.conditions[0];
-    try expectIdentifier(source, condition.name, "allow_ip");
+    try expect_identifier(source, condition.name, "allow_ip");
     try testing.expectEqual(@as(usize, 1), condition.params.len);
     try expectParameter(source, condition.params[0], .{
         .name = "ip",
         .type_name = "IpAddress",
         .declaration = "ip: IpAddress",
     });
-    try expectSpanText(source, condition.span, source);
+    try expect_span_text(source, condition.span, source);
 }
 
 test "parse model with condition with array param" {
@@ -556,9 +556,9 @@ test "parse model with multiple declarations" {
 
     try testing.expectEqual(@as(usize, 2), parsed.model.types.len);
     try testing.expectEqual(@as(usize, 1), parsed.model.conditions.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "User");
-    try expectIdentifier(source, parsed.model.conditions[0].name, "allow");
-    try expectIdentifier(source, parsed.model.types[1].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "User");
+    try expect_identifier(source, parsed.model.conditions[0].name, "allow");
+    try expect_identifier(source, parsed.model.types[1].name, "Group");
 }
 
 test "repeated identifiers share a symbol" {
@@ -580,62 +580,62 @@ test "declaration spans exclude surrounding source" {
     var parsed = try TestModel.parse(source);
     defer parsed.deinit();
 
-    try expectExactSpan(source, parsed.model.types[0].span, "type User {}");
-    try expectExactSpan(source, parsed.model.conditions[0].span, "condition allow() {}");
-    try expectExactSpan(source, parsed.model.types[1].span, "type Group {}");
+    try expect_exact_span(source, parsed.model.types[0].span, "type User {}");
+    try expect_exact_span(source, parsed.model.conditions[0].span, "condition allow() {}");
+    try expect_exact_span(source, parsed.model.types[1].span, "type Group {}");
 }
 
 test "parse model with condition with illegal character" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "condition allow_ip(ip: IpAddress) { @ }",
     );
 }
 
 test "parse model with condition missing opening paren" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip ip: IpAddress {}",
     );
 }
 
 test "parse model with condition missing closing paren" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress {}",
     );
 }
 
 test "parse model with condition missing opening brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress)",
     );
 }
 
 test "parse model with condition missing closing brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress) {",
     );
 }
 
 test "parse model with condition missing opening bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress]) {}",
     );
 }
 
 test "parse model with condition missing closing bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress[) {}",
     );
 }
 
 test "parse model with mixed valid and invalid conditions" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "condition allow_ip(ip: IpAddress) {} condition allow() {",
     );
@@ -652,13 +652,13 @@ test "parse model with a type with multiple relations" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
     try testing.expectEqual(@as(usize, 2), parsed.model.types[0].relations.len);
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
-    try expectRelation(source, parsed.model.types[0].relations[1], .{
+    try expect_relation(source, parsed.model.types[0].relations[1], .{
         .name = "owner",
         .cardinality = null,
     });
@@ -674,9 +674,9 @@ test "parse model with a type with relation without upper bound" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
     try testing.expectEqual(@as(usize, 1), parsed.model.types[0].relations.len);
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 1, .max = null },
     });
@@ -692,9 +692,9 @@ test "parse model with a type with relation without lower bound" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 1), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "Group");
     try testing.expectEqual(@as(usize, 1), parsed.model.types[0].relations.len);
-    try expectRelation(source, parsed.model.types[0].relations[0], .{
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
@@ -713,91 +713,91 @@ test "parse a simple model with valid relations" {
     defer parsed.deinit();
 
     try testing.expectEqual(@as(usize, 2), parsed.model.types.len);
-    try expectIdentifier(source, parsed.model.types[0].name, "User");
-    try expectIdentifier(source, parsed.model.types[1].name, "Group");
+    try expect_identifier(source, parsed.model.types[0].name, "User");
+    try expect_identifier(source, parsed.model.types[1].name, "Group");
     try testing.expectEqual(@as(usize, 2), parsed.model.types[1].relations.len);
-    try expectRelation(source, parsed.model.types[1].relations[0], .{
+    try expect_relation(source, parsed.model.types[1].relations[0], .{
         .name = "owner",
         .cardinality = null,
     });
-    try expectRelation(source, parsed.model.types[1].relations[1], .{
+    try expect_relation(source, parsed.model.types[1].relations[1], .{
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
 }
 
 test "parse model with a type missing opening brace" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User }",
     );
 }
 
 test "parse model with a type with a relation with missing closing bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10: User }",
     );
 }
 
 test "parse model with a type with a relation with missing opening bracket" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member 0..10]: User }",
     );
 }
 
 test "parse model with a type with a relation with missing range token" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member [ 10]: User }",
     );
 }
 
 test "parse model with a type with a relation with missing colon" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10] User }",
     );
 }
 
 test "parse model with mixed valid and invalid types" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User {} type Group {",
     );
 }
 
 test "parse model with a relation with repeated range" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type User { relation member[0..10..20]: User }",
     );
 }
 
 test "parse model with a relation with empty expression" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.UnexpectedToken,
         "type Group { relation member: }",
     );
 }
 
 test "parse model with a relation with illegal character in expression" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "type Group { relation member: @ }",
     );
 }
 
 test "parse model with a relation with illegal character in declaration" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "type Group { relation member@: User }",
     );
 }
 
 test "parse model with a relation with illegal character in cardinality" {
-    try expectParseError(
+    try expect_parse_error(
         ParserError.IllegalCharacter,
         "type Group { relation member[0..10@]: User }",
     );

@@ -4,6 +4,7 @@ pub const model = struct {
     pub const parser = @import("model/parser.zig");
     pub const symbol = @import("model/symbol.zig");
     pub const token = @import("model/token.zig");
+    pub const limits = @import("model/limits.zig");
 };
 
 test {
@@ -12,4 +13,5 @@ test {
     _ = model.parser;
     _ = model.symbol;
     _ = model.token;
+    _ = model.limits;
 }

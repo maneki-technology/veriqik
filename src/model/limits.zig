@@ -1,3 +1,4 @@
+/// Collection items are parsed before count limits are enforced so syntax errors take precedence.
 pub const Limits = struct {
     source_bytes_max: usize = 1 * 1024 * 1024,
     identifier_bytes_max: usize = 255,

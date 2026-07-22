@@ -15,6 +15,9 @@ pub const SymbolId = enum(u16) {
     }
 };
 
+pub const symbol_count_capacity: usize =
+    @as(usize, std.math.maxInt(u16)) + 1;
+
 const InternerError = error{
     TooManySymbols,
     IdentifierTooLong,
@@ -32,6 +35,8 @@ pub const Interner = struct {
         symbol_count_max: usize,
         identifier_bytes_max: usize,
     ) Interner {
+        std.debug.assert(symbol_count_max <= symbol_count_capacity);
+
         return .{
             .allocator = allocator,
             .name_by_id = .empty,

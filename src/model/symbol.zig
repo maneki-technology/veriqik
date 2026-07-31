@@ -15,8 +15,8 @@ pub const SymbolId = enum(u16) {
     }
 };
 
-pub const symbol_count_capacity: usize =
-    @as(usize, std.math.maxInt(u16)) + 1;
+pub const symbol_count_capacity: u32 =
+    @as(u32, std.math.maxInt(u16)) + 1;
 
 const InternerError = error{
     TooManySymbols,
@@ -27,13 +27,13 @@ pub const Interner = struct {
     allocator: std.mem.Allocator,
     name_by_id: ArrayList,
     id_by_name: Map,
-    symbol_count_max: usize,
-    identifier_bytes_max: usize,
+    symbol_count_max: u32,
+    identifier_bytes_max: u8,
 
     pub fn init(
         allocator: std.mem.Allocator,
-        symbol_count_max: usize,
-        identifier_bytes_max: usize,
+        symbol_count_max: u32,
+        identifier_bytes_max: u8,
     ) Interner {
         std.debug.assert(symbol_count_max <= symbol_count_capacity);
 
@@ -71,7 +71,7 @@ pub const Interner = struct {
             try self.name_by_id.append(self.allocator, name_owned);
             errdefer _ = self.name_by_id.pop();
 
-            const symbol_id = SymbolId.from_int(@as(u16, @intCast(id)));
+            const symbol_id = SymbolId.from_int(@intCast(id));
             try self.id_by_name.put(self.allocator, name_owned, symbol_id);
 
             return symbol_id;

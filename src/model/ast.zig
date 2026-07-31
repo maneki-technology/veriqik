@@ -2,8 +2,8 @@ const std = @import("std");
 const SymbolId = @import("symbol.zig").SymbolId;
 
 pub const Span = struct {
-    start: usize,
-    end: usize,
+    start: u32,
+    end: u32,
 };
 
 pub const Identifier = struct {
@@ -12,8 +12,8 @@ pub const Identifier = struct {
 };
 
 pub const Cardinality = struct {
-    min: usize = 0,
-    max: ?usize,
+    min: u32 = 0,
+    max: ?u32,
 };
 
 pub const Relation = struct {

@@ -16,9 +16,11 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
 
 pub const Lexer = struct {
     input: []const u8,
-    position: usize,
+    position: u32,
 
-    pub fn init(input: []const u8) Lexer {
+    pub fn init(input: []const u8, source_bytes_max: u32) Lexer {
+        std.debug.assert(input.len <= source_bytes_max);
+
         const lexer = Lexer{
             .input = input,
             .position = 0,
@@ -43,6 +45,13 @@ pub const Lexer = struct {
             return;
         }
         self.position += 1;
+    }
+
+    fn has_lookahead(position: u32, input_len: u32) bool {
+        if (position >= input_len) {
+            return false;
+        }
+        return input_len - position > 1;
     }
 
     fn read_single_character_token(self: *Lexer) Token {
@@ -100,7 +109,8 @@ pub const Lexer = struct {
     }
 
     fn peek(self: *Lexer) u8 {
-        if (self.position + 1 >= self.input.len) {
+        const input_len: u32 = @intCast(self.input.len);
+        if (!has_lookahead(self.position, input_len)) {
             return 0;
         }
         return self.input[self.position + 1];
@@ -214,7 +224,8 @@ pub const Lexer = struct {
     }
 
     fn is_comment_end(self: *Lexer) bool {
-        if (self.position + 1 >= self.input.len) {
+        const input_len: u32 = @intCast(self.input.len);
+        if (!has_lookahead(self.position, input_len)) {
             return true;
         }
         return self.current() == '\n' or self.current() == '\r';
@@ -297,7 +308,7 @@ fn expect_tokens(input: []const u8, expected: []const ExpectedToken) !void {
     try testing.expect(expected.len > 0);
     try testing.expectEqual(TokenType.eof, expected[expected.len - 1].type);
 
-    var lexer = Lexer.init(input);
+    var lexer = Lexer.init(input, 1024 * 1024);
     for (expected) |want| {
         const actual = lexer.next();
         try testing.expectEqual(want.type, actual.type);
@@ -390,6 +401,13 @@ test "comments" {
         "// this is yet another comment\r\n";
     const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
     try expect_tokens(input, &expected);
+}
+
+test "lookahead at maximum source offset" {
+    const input_len = std.math.maxInt(u32);
+    try testing.expect(!Lexer.has_lookahead(input_len, input_len));
+    try testing.expect(!Lexer.has_lookahead(input_len - 1, input_len));
+    try testing.expect(Lexer.has_lookahead(input_len - 2, input_len));
 }
 
 test "illegal characters" {

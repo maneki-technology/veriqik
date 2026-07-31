@@ -42,7 +42,7 @@ pub const Parser = struct {
         if (source.len > limits.source_bytes_max) {
             return ParserError.SourceTooLarge;
         }
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, limits.source_bytes_max);
         const interner = Interner.init(
             allocator,
             limits.symbol_count_max,
@@ -296,10 +296,10 @@ pub const Parser = struct {
         };
     }
 
-    fn parse_integer(self: *Parser) !usize {
+    fn parse_integer(self: *Parser) !u32 {
         const token = try self.consume(.integer);
         return std.fmt.parseUnsigned(
-            usize,
+            u32,
             self.lexeme(token),
             10,
         ) catch ParserError.CardinalityOverflow;
@@ -432,8 +432,8 @@ fn expect_span_text(source: []const u8, span: ast.Span, expected: []const u8) !v
 fn expect_exact_span(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
     const start = std.mem.indexOf(u8, source, expected_text).?;
     try testing.expectEqual(ast.Span{
-        .start = start,
-        .end = start + expected_text.len,
+        .start = @intCast(start),
+        .end = @intCast(start + expected_text.len),
     }, actual);
 }
 
@@ -841,6 +841,35 @@ test "parse model with a type with relation without lower bound" {
         .name = "member",
         .cardinality = .{ .min = 0, .max = 10 },
     });
+}
+
+test "parse model with maximum relation cardinality" {
+    const source =
+        \\type Group {
+        \\  relation member[4294967295..4294967295]: User
+        \\}
+    ;
+    var parsed = try TestModel.parse(source);
+    defer parsed.deinit();
+
+    try expect_relation(source, parsed.model.types[0].relations[0], .{
+        .name = "member",
+        .cardinality = .{
+            .min = std.math.maxInt(u32),
+            .max = std.math.maxInt(u32),
+        },
+    });
+}
+
+test "reject relation cardinality above u32" {
+    try expect_parse_error(
+        ParserError.CardinalityOverflow,
+        "type Group { relation member[4294967296..]: User }",
+    );
+    try expect_parse_error(
+        ParserError.CardinalityOverflow,
+        "type Group { relation member[..4294967296]: User }",
+    );
 }
 
 test "parse a simple model with valid relations" {

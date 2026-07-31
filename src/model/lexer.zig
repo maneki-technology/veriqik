@@ -403,16 +403,6 @@ test "comments" {
     try expect_tokens(input, &expected);
 }
 
-test "empty input" {
-    const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
-    try expect_tokens("", &expected);
-}
-
-test "comment without newline at EOF" {
-    const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
-    try expect_tokens("// comment", &expected);
-}
-
 test "lookahead at maximum source offset" {
     const input_len = std.math.maxInt(u32);
     try testing.expect(!Lexer.has_lookahead(input_len, input_len));

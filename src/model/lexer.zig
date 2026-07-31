@@ -16,7 +16,7 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
 
 pub const Lexer = struct {
     input: []const u8,
-    position: usize,
+    position: u32,
 
     pub fn init(input: []const u8) Lexer {
         const lexer = Lexer{

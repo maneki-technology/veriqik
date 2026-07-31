@@ -296,10 +296,10 @@ pub const Parser = struct {
         };
     }
 
-    fn parse_integer(self: *Parser) !usize {
+    fn parse_integer(self: *Parser) !u32 {
         const token = try self.consume(.integer);
         return std.fmt.parseUnsigned(
-            usize,
+            u32,
             self.lexeme(token),
             10,
         ) catch ParserError.CardinalityOverflow;
@@ -432,8 +432,8 @@ fn expect_span_text(source: []const u8, span: ast.Span, expected: []const u8) !v
 fn expect_exact_span(source: []const u8, actual: ast.Span, expected_text: []const u8) !void {
     const start = std.mem.indexOf(u8, source, expected_text).?;
     try testing.expectEqual(ast.Span{
-        .start = start,
-        .end = start + expected_text.len,
+        .start = @as(u32, @intCast(start)),
+        .end = @as(u32, @intCast(start)) + @as(u32, @intCast(expected_text.len)),
     }, actual);
 }
 

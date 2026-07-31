@@ -52,7 +52,7 @@ pub const TokenType = enum(u8) {
 };
 
 pub const Token = struct {
-    start: usize,
-    end: usize,
+    start: u32,
+    end: u32,
     type: TokenType,
 };

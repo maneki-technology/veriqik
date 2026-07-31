@@ -15,7 +15,7 @@ pub const SymbolId = enum(u16) {
     }
 };
 
-pub const symbol_count_capacity: usize =
+pub const symbol_count_capacity: u32 =
     @as(usize, std.math.maxInt(u16)) + 1;
 
 const InternerError = error{

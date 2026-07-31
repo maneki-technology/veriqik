@@ -102,6 +102,9 @@ pub const Lexer = struct {
     }
 
     fn peek(self: *Lexer) u8 {
+        if (self.position == self.input.len) {
+            return 0;
+        }
         if (self.position + 1 >= self.input.len) {
             return 0;
         }
@@ -216,6 +219,10 @@ pub const Lexer = struct {
     }
 
     fn is_comment_end(self: *Lexer) bool {
+        if (self.position == self.input.len) {
+            return true;
+        }
+
         if (self.position + 1 >= self.input.len) {
             return true;
         }

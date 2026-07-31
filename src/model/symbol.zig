@@ -27,13 +27,13 @@ pub const Interner = struct {
     allocator: std.mem.Allocator,
     name_by_id: ArrayList,
     id_by_name: Map,
-    symbol_count_max: usize,
-    identifier_bytes_max: usize,
+    symbol_count_max: u32,
+    identifier_bytes_max: u8,
 
     pub fn init(
         allocator: std.mem.Allocator,
-        symbol_count_max: usize,
-        identifier_bytes_max: usize,
+        symbol_count_max: u32,
+        identifier_bytes_max: u8,
     ) Interner {
         std.debug.assert(symbol_count_max <= symbol_count_capacity);
 

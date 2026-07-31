@@ -18,7 +18,9 @@ pub const Lexer = struct {
     input: []const u8,
     position: u32,
 
-    pub fn init(input: []const u8) Lexer {
+    pub fn init(input: []const u8, source_bytes_max: u32) Lexer {
+        std.debug.assert(input.len <= source_bytes_max);
+
         const lexer = Lexer{
             .input = input,
             .position = 0,
@@ -297,7 +299,7 @@ fn expect_tokens(input: []const u8, expected: []const ExpectedToken) !void {
     try testing.expect(expected.len > 0);
     try testing.expectEqual(TokenType.eof, expected[expected.len - 1].type);
 
-    var lexer = Lexer.init(input);
+    var lexer = Lexer.init(input, 1024 * 1024);
     for (expected) |want| {
         const actual = lexer.next();
         try testing.expectEqual(want.type, actual.type);

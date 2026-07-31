@@ -42,7 +42,7 @@ pub const Parser = struct {
         if (source.len > limits.source_bytes_max) {
             return ParserError.SourceTooLarge;
         }
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, limits.source_bytes_max);
         const interner = Interner.init(
             allocator,
             limits.symbol_count_max,

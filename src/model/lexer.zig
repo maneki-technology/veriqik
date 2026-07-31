@@ -47,6 +47,13 @@ pub const Lexer = struct {
         self.position += 1;
     }
 
+    fn has_lookahead(position: u32, input_len: u32) bool {
+        if (position >= input_len) {
+            return false;
+        }
+        return input_len - position > 1;
+    }
+
     fn read_single_character_token(self: *Lexer) Token {
         var token = Token{
             .type = TokenType.illegal,
@@ -102,10 +109,8 @@ pub const Lexer = struct {
     }
 
     fn peek(self: *Lexer) u8 {
-        if (self.position == self.input.len) {
-            return 0;
-        }
-        if (self.position + 1 >= self.input.len) {
+        const input_len: u32 = @intCast(self.input.len);
+        if (!has_lookahead(self.position, input_len)) {
             return 0;
         }
         return self.input[self.position + 1];
@@ -219,11 +224,8 @@ pub const Lexer = struct {
     }
 
     fn is_comment_end(self: *Lexer) bool {
-        if (self.position == self.input.len) {
-            return true;
-        }
-
-        if (self.position + 1 >= self.input.len) {
+        const input_len: u32 = @intCast(self.input.len);
+        if (!has_lookahead(self.position, input_len)) {
             return true;
         }
         return self.current() == '\n' or self.current() == '\r';
@@ -399,6 +401,23 @@ test "comments" {
         "// this is yet another comment\r\n";
     const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
     try expect_tokens(input, &expected);
+}
+
+test "empty input" {
+    const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
+    try expect_tokens("", &expected);
+}
+
+test "comment without newline at EOF" {
+    const expected = [_]ExpectedToken{.{ .type = .eof, .lexeme = "" }};
+    try expect_tokens("// comment", &expected);
+}
+
+test "lookahead at maximum source offset" {
+    const input_len = std.math.maxInt(u32);
+    try testing.expect(!Lexer.has_lookahead(input_len, input_len));
+    try testing.expect(!Lexer.has_lookahead(input_len - 1, input_len));
+    try testing.expect(Lexer.has_lookahead(input_len - 2, input_len));
 }
 
 test "illegal characters" {
